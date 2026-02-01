@@ -2,6 +2,7 @@ import { ChatInput } from '@/components/chat/ChatInput';
 import { LandingPage } from '@/components/chat/LandingPage';
 import { MessageBubble, type Message } from '@/components/chat/MessageBubble';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -37,6 +38,7 @@ export default function ChatScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const showLandingPage = messages.length === 0;
+  const router = useRouter();
 
   useEffect(() => {
     // Scroll to bottom when messages change
@@ -119,9 +121,13 @@ export default function ChatScreen() {
   };
 
   const handleActionPress = (actionId: string) => {
+    if (actionId === 'profile') {
+      router.push('/profile');
+      return;
+    }
+
     const actionPrompts: Record<string, string> = {
       code: 'Help me with coding',
-      profile: 'Teach me something new',
       strategize: 'Help me plan and strategize',
       write: 'Help me write',
       life: 'Help me with life stuff',
