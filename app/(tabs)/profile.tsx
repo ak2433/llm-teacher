@@ -1,6 +1,9 @@
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useState } from 'react';
 import {
+    Platform,
     ScrollView,
     StyleSheet,
     Text,
@@ -30,6 +33,9 @@ export default function ProfileScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
   const [isSelectMode, setIsSelectMode] = useState(false);
+  const colorScheme = useColorScheme();
+  const textColor = colorScheme === 'dark' ? '#FFFFFF' : '#000000';
+  const router = useRouter();
 
   const filteredSubjects = SUBJECTS.filter((subject) =>
     subject.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -65,7 +71,7 @@ export default function ProfileScreen() {
           <Text style={styles.headerTitle}>Subjects</Text>
         </View>
         
-        <TouchableOpacity style={styles.newSubjectButton}>
+        <TouchableOpacity style={styles.newSubjectButton} onPress={() => router.push('/chat')}>
           <Text style={styles.plusIcon}>+</Text>
           <Text style={styles.newSubjectText}>New subject</Text>
         </TouchableOpacity>
@@ -74,9 +80,12 @@ export default function ProfileScreen() {
       {/* Search Bar */}
       <View style={styles.searchContainer}>
         <View style={styles.searchWrapper}>
-          <Text style={styles.searchIcon}>🔍</Text>
           <TextInput
-            style={styles.searchInput}
+            style={[
+                styles.searchInput,
+                { color: textColor },
+                Platform.OS === 'web' && { outlineStyle: 'none', boxShadow: 'none' } as any,
+            ]}
             placeholder="Search your subjects..."
             placeholderTextColor="#666"
             value={searchQuery}
@@ -193,7 +202,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#8B5CF6',
+    backgroundColor: '#FF6A3D',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -260,7 +269,7 @@ const styles = StyleSheet.create({
   },
   selectText: {
     fontSize: 14,
-    color: '#8B5CF6',
+    color: '#FF6A3D',
     fontWeight: '500',
   },
   subjectsList: {
@@ -315,8 +324,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   checkboxSelected: {
-    backgroundColor: '#8B5CF6',
-    borderColor: '#8B5CF6',
+    backgroundColor: '#FF6A3D',
+    borderColor: '#FF6A3D',
   },
   checkmark: {
     color: '#FFFFFF',
@@ -339,7 +348,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#8B5CF6',
+    backgroundColor: '#FF6A3D',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -367,7 +376,7 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     flex: 1,
-    backgroundColor: '#8B5CF6',
+    backgroundColor: '#FF6A3D',
     paddingVertical: 12,
     borderRadius: 8,
     alignItems: 'center',
