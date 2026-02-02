@@ -50,7 +50,11 @@ export function ChatInput({ onSend }: ChatInputProps) {
           />
 
           <TextInput
-            style={[styles.input, { color: textColor }]}
+            style={[
+              styles.input,
+              { color: textColor },
+              Platform.OS === 'web' && { outlineStyle: 'none', boxShadow: 'none' } as any,
+            ]}
             value={message}
             onChangeText={setMessage}
             placeholder="How can I help you today?"
