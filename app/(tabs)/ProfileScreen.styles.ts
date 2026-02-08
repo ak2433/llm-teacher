@@ -26,7 +26,7 @@ export const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#FF6A3D',
+    backgroundColor: '#2872A1',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -93,7 +93,7 @@ export const styles = StyleSheet.create({
   },
   selectText: {
     fontSize: 14,
-    color: '#FF6A3D',
+    color: '#2872A1',
     fontWeight: '500',
   },
   subjectsList: {
@@ -200,7 +200,7 @@ export const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#FF6A3D',
+    backgroundColor: '#2872A1',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -228,13 +228,13 @@ export const styles = StyleSheet.create({
   },
   actionButton: {
     flex: 1,
-    backgroundColor: '#FF6A3D',
+    backgroundColor: '#2872A1',
     paddingVertical: 12,
     borderRadius: 8,
     alignItems: 'center',
   },
   actionButtonSecondary: {
-    backgroundColor: '#2A2A2A',
+    backgroundColor: '#2872A1',
   },
   actionButtonText: {
     fontSize: 14,

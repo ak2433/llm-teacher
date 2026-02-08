@@ -1,6 +1,6 @@
-import React from 'react';
-import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import React from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 type ActionButton = {
   id: string;
@@ -99,12 +99,12 @@ const styles = StyleSheet.create({
   },
   welcomeIconText: {
     fontSize: 32,
-    color: '#FF6A3D',
+    color: '#2872A1',
   },
   welcomeText: {
     fontSize: 32,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: '#CBDDE9',
   },
   actionsContainer: {
     flexDirection: 'row',
