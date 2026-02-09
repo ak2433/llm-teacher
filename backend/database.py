@@ -1,54 +1,51 @@
-# This will handle the database for users and their progress.
+# database.py
 import sqlite3
 from datetime import datetime
 from typing import List, Optional, Dict
 
-DATABASE_PATH= "backend/database.db"
+DATABASE_PATH = "learning_app.db"
 
 def get_db_connection():
+    """Get a database connection"""
     conn = sqlite3.connect(DATABASE_PATH)
-    conn.row_factory = sqlite3.Row # tHIS is used so that we can use row["name"] instead of row[0]
+    conn.row_factory = sqlite3.Row  # This allows accessing columns by name
+    return conn
 
+def init_db():
+    """Initialize the database and create tables"""
+    conn = get_db_connection()
     try:
-        yield conn
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS subjects (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                progress INTEGER DEFAULT 0,
+                last_message_at TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                icon TEXT DEFAULT '📚'
+            )
+        """)
         conn.commit()
-    except Exception:
-        conn.rollback()
+        print("✅ Database initialized successfully")
+    except Exception as e:
+        print(f"❌ Database initialization failed: {e}")
         raise
     finally:
         conn.close()
 
-def init_db():
-    with get_db_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            email TEXT NOT NULL,
-            password TEXT NOT NULL
-        )
-        """)
-        conn.commit()
-
-        print("Database initialized")
-
 def get_time_ago(timestamp: str) -> str:
-    """
-    Convert an ISO timestamp into a human-friendly string
-    like: '5 minutes ago' or '2 days ago'
-    """
+    """Convert timestamp to human-readable 'time ago' format"""
     if not timestamp:
         return "Never"
-
+    
     try:
-        # Convert ISO string back into a datetime object
         dt = datetime.fromisoformat(timestamp)
         now = datetime.now()
         diff = now - dt
-
+        
         seconds = diff.total_seconds()
-
+        
         if seconds < 60:
             return "Just now"
         elif seconds < 3600:
@@ -69,53 +66,20 @@ def get_time_ago(timestamp: str) -> str:
     except Exception:
         return "Unknown"
 
-def get_all_subjects() -> List[Dict]:
-    with get_db_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT id, name, progress, last_message_at, icon, created_at
-            FROM subjects
-            ORDER BY last_message_at DESC NULLS LAST, created_at DESC
-        """)
-    subjects = []
-    for row in cursor.fetchall():
-        subjects.append({
-                "id": row["id"],
-                "name": row["name"],
-                "progress": row["progress"],
-                "lastMessage": f"Last session {get_time_ago(row['last_message_at'])}",
-                "icon": row["icon"] or "📚"
-            })
-    return subjects
-
-def get_subject_by_id(subject_id: int) -> Optional[Dict]:
-    with get_db_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT id, name, progress, last_message_at, icon, created_at
-            FROM subjects
-            WHERE id = ?
-        """, (subject_id,))
-        row = cursor.fetchone()
-        if row:
-            return {
-                "id": row["id"],
-                "name": row["name"],
-                "progress": row["progress"],
-                "lastMessage": f"Last session {get_time_ago(row['last_message_at'])}",
-                "icon": row["icon"] or "📚"
-            }
-    return None
+# CRUD Operations
 
 def create_subject(name: str, icon: str = "📚") -> Dict:
-    with get_db_connection() as conn:
+    """Create a new subject"""
+    conn = get_db_connection()
+    try:
         cursor = conn.cursor()
-        cursor.execute("""
-            INSERT INTO subjects (name, progress, last_message_at, icon, created_at)
-            VALUES (?, 0, NULL, ?, datetime('now'))
-        """, (name, icon, datetime.now().isoformat()))
+        cursor.execute(
+            "INSERT INTO subjects (name, icon, last_message_at) VALUES (?, ?, ?)",
+            (name, icon, datetime.now().isoformat())
+        )
         subject_id = cursor.lastrowid
-
+        conn.commit()
+        
         return {
             "id": subject_id,
             "name": name,
@@ -123,24 +87,21 @@ def create_subject(name: str, icon: str = "📚") -> Dict:
             "icon": icon,
             "lastMessage": "Just now"
         }
+    finally:
+        conn.close()
 
 def get_all_subjects() -> List[Dict]:
-    """
-    Fetch all subjects from the database,
-    sorted by most recent activity.
-    """
-    with get_db_connection() as conn:
+    """Get all subjects with formatted data"""
+    conn = get_db_connection()
+    try:
         cursor = conn.cursor()
-
         cursor.execute("""
-            SELECT id, name, progress, last_message_at, icon, created_at
-            FROM subjects
-            ORDER BY last_message_at DESC NULLS LAST, created_at DESC
+            SELECT id, name, progress, last_message_at, icon, created_at 
+            FROM subjects 
+            ORDER BY last_message_at DESC, created_at DESC
         """)
-
+        
         subjects = []
-
-        # Convert each database row into a Python dict
         for row in cursor.fetchall():
             subjects.append({
                 "id": row["id"],
@@ -149,28 +110,22 @@ def get_all_subjects() -> List[Dict]:
                 "lastMessage": f"Last session {get_time_ago(row['last_message_at'])}",
                 "icon": row["icon"] or "📚"
             })
-
+        
         return subjects
+    finally:
+        conn.close()
 
 def get_subject_by_id(subject_id: int) -> Optional[Dict]:
-    """
-    Fetch a single subject by its ID.
-    Returns None if not found.
-    """
-    with get_db_connection() as conn:
+    """Get a single subject by ID"""
+    conn = get_db_connection()
+    try:
         cursor = conn.cursor()
-
         cursor.execute(
-            """
-            SELECT id, name, progress, last_message_at, icon
-            FROM subjects
-            WHERE id = ?
-            """,
+            "SELECT id, name, progress, last_message_at, icon FROM subjects WHERE id = ?",
             (subject_id,)
         )
-
         row = cursor.fetchone()
-
+        
         if row:
             return {
                 "id": row["id"],
@@ -179,82 +134,61 @@ def get_subject_by_id(subject_id: int) -> Optional[Dict]:
                 "lastMessage": f"Last session {get_time_ago(row['last_message_at'])}",
                 "icon": row["icon"] or "📚"
             }
-        
-    return None
+        return None
+    finally:
+        conn.close()
 
-
-def update_subject_progress(
-    subject_id: int,
-    progress: int,
-    update_timestamp: bool = True
-) -> Optional[Dict]:
-    """
-    Update a subject's progress.
-    Optionally updates the last_message_at timestamp.
-    """
-    with get_db_connection() as conn:
+def update_subject_progress(subject_id: int, progress: int, update_timestamp: bool = True) -> Optional[Dict]:
+    """Update subject progress and optionally last_message_at"""
+    conn = get_db_connection()
+    try:
         cursor = conn.cursor()
-
+        
         if update_timestamp:
             cursor.execute(
-                """
-                UPDATE subjects
-                SET progress = ?, last_message_at = ?
-                WHERE id = ?
-                """,
+                "UPDATE subjects SET progress = ?, last_message_at = ? WHERE id = ?",
                 (progress, datetime.now().isoformat(), subject_id)
             )
         else:
             cursor.execute(
-                """
-                UPDATE subjects
-                SET progress = ?
-                WHERE id = ?
-                """,
+                "UPDATE subjects SET progress = ? WHERE id = ?",
                 (progress, subject_id)
             )
-
-        # If no rows were updated, the ID didn't exist
+        
+        conn.commit()
+        
         if cursor.rowcount == 0:
             return None
-
+        
         return get_subject_by_id(subject_id)
-
+    finally:
+        conn.close()
 
 def update_subject_last_message(subject_id: int) -> Optional[Dict]:
-    """
-    Update only the last_message_at timestamp.
-    """
-    with get_db_connection() as conn:
+    """Update only the last_message_at timestamp"""
+    conn = get_db_connection()
+    try:
         cursor = conn.cursor()
-
         cursor.execute(
-            """
-            UPDATE subjects
-            SET last_message_at = ?
-            WHERE id = ?
-            """,
+            "UPDATE subjects SET last_message_at = ? WHERE id = ?",
             (datetime.now().isoformat(), subject_id)
         )
-
+        conn.commit()
+        
         if cursor.rowcount == 0:
             return None
-
+        
         return get_subject_by_id(subject_id)
-
+    finally:
+        conn.close()
 
 def delete_subject(subject_id: int) -> bool:
-    """
-    Delete a subject by ID.
-    Returns True if something was deleted.
-    """
-    with get_db_connection() as conn:
+    """Delete a subject"""
+    conn = get_db_connection()
+    try:
         cursor = conn.cursor()
-
-        cursor.execute(
-            "DELETE FROM subjects WHERE id = ?",
-            (subject_id,)
-        )
-
+        cursor.execute("DELETE FROM subjects WHERE id = ?", (subject_id,))
+        conn.commit()
         return cursor.rowcount > 0
-   
+    finally:
+        conn.close()
