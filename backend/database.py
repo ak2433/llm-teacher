@@ -152,5 +152,109 @@ def get_all_subjects() -> List[Dict]:
 
         return subjects
 
-    
+def get_subject_by_id(subject_id: int) -> Optional[Dict]:
+    """
+    Fetch a single subject by its ID.
+    Returns None if not found.
+    """
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+
+        cursor.execute(
+            """
+            SELECT id, name, progress, last_message_at, icon
+            FROM subjects
+            WHERE id = ?
+            """,
+            (subject_id,)
+        )
+
+        row = cursor.fetchone()
+
+        if row:
+            return {
+                "id": row["id"],
+                "name": row["name"],
+                "progress": row["progress"],
+                "lastMessage": f"Last session {get_time_ago(row['last_message_at'])}",
+                "icon": row["icon"] or "📚"
+            }
+        
+    return None
+
+
+def update_subject_progress(
+    subject_id: int,
+    progress: int,
+    update_timestamp: bool = True
+) -> Optional[Dict]:
+    """
+    Update a subject's progress.
+    Optionally updates the last_message_at timestamp.
+    """
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+
+        if update_timestamp:
+            cursor.execute(
+                """
+                UPDATE subjects
+                SET progress = ?, last_message_at = ?
+                WHERE id = ?
+                """,
+                (progress, datetime.now().isoformat(), subject_id)
+            )
+        else:
+            cursor.execute(
+                """
+                UPDATE subjects
+                SET progress = ?
+                WHERE id = ?
+                """,
+                (progress, subject_id)
+            )
+
+        # If no rows were updated, the ID didn't exist
+        if cursor.rowcount == 0:
+            return None
+
+        return get_subject_by_id(subject_id)
+
+
+def update_subject_last_message(subject_id: int) -> Optional[Dict]:
+    """
+    Update only the last_message_at timestamp.
+    """
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+
+        cursor.execute(
+            """
+            UPDATE subjects
+            SET last_message_at = ?
+            WHERE id = ?
+            """,
+            (datetime.now().isoformat(), subject_id)
+        )
+
+        if cursor.rowcount == 0:
+            return None
+
+        return get_subject_by_id(subject_id)
+
+
+def delete_subject(subject_id: int) -> bool:
+    """
+    Delete a subject by ID.
+    Returns True if something was deleted.
+    """
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "DELETE FROM subjects WHERE id = ?",
+            (subject_id,)
+        )
+
+        return cursor.rowcount > 0
    
