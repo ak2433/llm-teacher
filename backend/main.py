@@ -20,11 +20,11 @@ from database import (
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    print("🚀 Starting up...")
+    print("Starting up...")
     init_db()
     yield
     # Shutdown
-    print("👋 Shutting down...")
+    print("Shutting down...")
 
 app = FastAPI(lifespan=lifespan)
 
