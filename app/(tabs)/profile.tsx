@@ -1,18 +1,18 @@
 // ProfileScreen.tsx (or your component file)
+import { styles } from '@/components/profile/_ProfileScreen.styles'; // Import styles
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useState } from 'react';
 import {
-    Platform,
-    ScrollView,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  Platform,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { styles } from './ProfileScreen.styles'; // Import styles
 
 interface Subject {
   id: string;
