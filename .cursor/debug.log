@@ -1,0 +1,2 @@
+{"location":"app/(tabs)/profile.tsx:useEffect","message":"Failed to fetch subjects","data":{"error":"TypeError: NetworkError when attempting to fetch resource."},"timestamp":1770831049432,"runId":"pre-fix","hypothesisId":"H2"}
+{"location":"app/(tabs)/profile.tsx:useEffect","message":"Fetched subjects","data":{"count":1},"timestamp":1770831643440,"runId":"pre-fix","hypothesisId":"H1"}
