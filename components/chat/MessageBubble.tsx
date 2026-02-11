@@ -1,6 +1,6 @@
-import React from 'react';
-import { StyleSheet, View, Text } from 'react-native';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import React from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 
 export type Message = {
   id: string;
@@ -39,15 +39,6 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           ]}>
           {message.text}
         </Text>
-        <Text
-          style={[
-            styles.timestamp,
-            message.isSent
-              ? styles.sentTimestamp
-              : [styles.receivedTimestamp, isDark ? styles.receivedTimestampDark : styles.receivedTimestampLight],
-          ]}>
-          {formatTime(message.timestamp)}
-        </Text>
       </View>
     </View>
   );
@@ -64,9 +55,9 @@ function formatTime(date: Date): string {
 
 const styles = StyleSheet.create({
   container: {
-    marginVertical: 2,
-    marginHorizontal: 12,
-    maxWidth: '75%',
+    marginVertical: 3,
+    marginHorizontal: 16,
+    maxWidth: '80%',
   },
   sentContainer: {
     alignSelf: 'flex-end',
@@ -77,40 +68,29 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   bubble: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 18,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 20,
   },
   sentBubble: {
-    borderBottomRightRadius: 4,
   },
   sentBubbleLight: {
-    backgroundColor: '#2C6BED',
+    backgroundColor: '#0B93F6',
   },
   sentBubbleDark: {
-    backgroundColor: '#2160C4',
+    backgroundColor: '#0B84ED',
   },
   receivedBubble: {
-    borderBottomLeftRadius: 4,
   },
   receivedBubbleLight: {
-    backgroundColor: '#E5E5EA',
+    backgroundColor: '#E9E9EB',
   },
   receivedBubbleDark: {
-    backgroundColor: '#2C2C2E',
+    backgroundColor: '#3A3A3C',
   },
   text: {
     fontSize: 16,
-    lineHeight: 20,
-    marginBottom: 4,
+    lineHeight: 21,
   },
   sentText: {
     color: '#FFFFFF',
@@ -123,23 +103,5 @@ const styles = StyleSheet.create({
   },
   receivedTextDark: {
     color: '#FFFFFF',
-  },
-  timestamp: {
-    fontSize: 11,
-    alignSelf: 'flex-end',
-    marginTop: 2,
-  },
-  sentTimestamp: {
-    color: '#FFFFFF',
-    opacity: 0.8,
-  },
-  receivedTimestamp: {
-    color: '#666666',
-  },
-  receivedTimestampLight: {
-    color: '#666666',
-  },
-  receivedTimestampDark: {
-    color: '#999999',
   },
 });
