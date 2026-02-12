@@ -98,7 +98,7 @@ async def chat(request: ChatRequest):
             messages=ollama_messages
         )
         
-        if request.subject_id:
+        if request.subject_id: # Test: Update progress by 5 points
             subject = get_subject_by_id(request.subject_id)
             if subject:
                 current_progress = subject["progress"]
@@ -189,5 +189,8 @@ async def list_models():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    init_db()
+    for i in range(10):
+        delete_subject(i)
     create_subject("math", icon="📚")
+    uvicorn.run(app, host="0.0.0.0", port=8000)

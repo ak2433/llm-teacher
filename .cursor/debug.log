@@ -11,3 +11,7 @@
 {"location":"app/(tabs)/profile.tsx:useEffect","message":"Fetched subjects","data":{"count":2},"timestamp":1770843215580,"runId":"pre-fix","hypothesisId":"H1"}
 {"location":"app/(tabs)/profile.tsx:useEffect","message":"Fetched subjects","data":{"count":3},"timestamp":1770921771270,"runId":"pre-fix","hypothesisId":"H1"}
 {"location":"app/(tabs)/profile.tsx:useEffect","message":"Fetched subjects","data":{"count":3},"timestamp":1770921825354,"runId":"pre-fix","hypothesisId":"H1"}
+{"location":"app/(tabs)/profile.tsx:useEffect","message":"Fetched subjects","data":{"count":4},"timestamp":1770923923887,"runId":"pre-fix","hypothesisId":"H1"}
+{"location":"app/(tabs)/profile.tsx:useEffect","message":"Fetched subjects","data":{"count":4},"timestamp":1770923953076,"runId":"pre-fix","hypothesisId":"H1"}
+{"location":"app/(tabs)/profile.tsx:useEffect","message":"Fetched subjects","data":{"count":4},"timestamp":1770924061870,"runId":"pre-fix","hypothesisId":"H1"}
+{"location":"app/(tabs)/profile.tsx:useEffect","message":"Fetched subjects","data":{"count":1},"timestamp":1770924074469,"runId":"pre-fix","hypothesisId":"H1"}
