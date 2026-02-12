@@ -2,3 +2,12 @@
 {"location":"app/(tabs)/profile.tsx:useEffect","message":"Fetched subjects","data":{"count":1},"timestamp":1770831643440,"runId":"pre-fix","hypothesisId":"H1"}
 {"location":"app/(tabs)/profile.tsx:useEffect","message":"Fetched subjects","data":{"count":1},"timestamp":1770832276845,"runId":"pre-fix","hypothesisId":"H1"}
 {"location":"app/(tabs)/profile.tsx:useEffect","message":"Fetched subjects","data":{"count":1},"timestamp":1770832280102,"runId":"pre-fix","hypothesisId":"H1"}
+{"location":"app/(tabs)/profile.tsx:useEffect","message":"Fetched subjects","data":{"count":1},"timestamp":1770835917435,"runId":"pre-fix","hypothesisId":"H1"}
+{"location":"app/(tabs)/profile.tsx:useEffect","message":"Fetched subjects","data":{"count":1},"timestamp":1770836030748,"runId":"pre-fix","hypothesisId":"H1"}
+{"location":"app/(tabs)/profile.tsx:useEffect","message":"Fetched subjects","data":{"count":1},"timestamp":1770836293079,"runId":"pre-fix","hypothesisId":"H1"}
+{"location":"app/(tabs)/profile.tsx:useEffect","message":"Fetched subjects","data":{"count":1},"timestamp":1770836643623,"runId":"pre-fix","hypothesisId":"H1"}
+{"location":"app/(tabs)/profile.tsx:useEffect","message":"Fetched subjects","data":{"count":1},"timestamp":1770839517017,"runId":"pre-fix","hypothesisId":"H1"}
+{"location":"app/(tabs)/profile.tsx:useEffect","message":"Fetched subjects","data":{"count":2},"timestamp":1770840253698,"runId":"pre-fix","hypothesisId":"H1"}
+{"location":"app/(tabs)/profile.tsx:useEffect","message":"Fetched subjects","data":{"count":2},"timestamp":1770843215580,"runId":"pre-fix","hypothesisId":"H1"}
+{"location":"app/(tabs)/profile.tsx:useEffect","message":"Fetched subjects","data":{"count":3},"timestamp":1770921771270,"runId":"pre-fix","hypothesisId":"H1"}
+{"location":"app/(tabs)/profile.tsx:useEffect","message":"Fetched subjects","data":{"count":3},"timestamp":1770921825354,"runId":"pre-fix","hypothesisId":"H1"}

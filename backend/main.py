@@ -98,10 +98,19 @@ async def chat(request: ChatRequest):
             messages=ollama_messages
         )
         
+        if request.subject_id:
+            subject = get_subject_by_id(request.subject_id)
+            if subject:
+                current_progress = subject["progress"]
+                new_progress = min(current_progress + 5, 100)
+                update_subject_progress(request.subject_id, new_progress)
+                print(f"Progress updated: {current_progress} -> {new_progress} for subject {request.subject_id}")
+
         return ChatResponse(
             message=response['message']['content'],
             model=request.model
         )
+        
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

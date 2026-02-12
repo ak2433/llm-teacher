@@ -186,6 +186,10 @@ export default function ProfileScreen() {
                 toggleSubjectSelection(subject.id);
               } else {
                 console.log('Navigate to subject:', subject.name);
+                router.push({
+                  pathname: '/chat',
+                  params: { subjectId: subject.id, subjectName: subject.name },
+                });
               }
             }}
           >

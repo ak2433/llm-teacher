@@ -2,9 +2,10 @@ import { ChatInput } from '@/components/chat/ChatInput';
 import { LandingPage } from '@/components/chat/LandingPage';
 import { MessageBubble, type Message } from '@/components/chat/MessageBubble';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useRef, useState } from 'react';
+
 import {
   ActivityIndicator,
   FlatList,
@@ -31,6 +32,11 @@ interface ChatMessage {
 }
 
 export default function ChatScreen() {
+  const { subjectId, subjectName } = useLocalSearchParams<{
+    subjectId?: string;
+    subjectName?: string;
+  }>();
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -67,6 +73,8 @@ export default function ChatScreen() {
         body: JSON.stringify({
           messages: updatedHistory,
           model: 'llama3.1:8b',
+          subject: subjectName ?? null,
+          subject_id: subjectId ? parseInt(subjectId) : null,
         }),
       });
 
