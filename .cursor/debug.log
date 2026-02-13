@@ -17,3 +17,6 @@
 {"location":"app/(tabs)/profile.tsx:useEffect","message":"Fetched subjects","data":{"count":1},"timestamp":1770924074469,"runId":"pre-fix","hypothesisId":"H1"}
 {"location":"app/(tabs)/profile.tsx:useEffect","message":"Fetched subjects","data":{"count":1},"timestamp":1770925795943,"runId":"pre-fix","hypothesisId":"H1"}
 {"location":"app/(tabs)/profile.tsx:useEffect","message":"Fetched subjects","data":{"count":1},"timestamp":1770925939481,"runId":"pre-fix","hypothesisId":"H1"}
+{"location":"app/(tabs)/profile.tsx:useEffect","message":"Fetched subjects","data":{"count":1},"timestamp":1770927216993,"runId":"pre-fix","hypothesisId":"H1"}
+{"location":"app/(tabs)/profile.tsx:useEffect","message":"Fetched subjects","data":{"count":1},"timestamp":1770930547154,"runId":"pre-fix","hypothesisId":"H1"}
+{"location":"app/(tabs)/profile.tsx:useEffect","message":"Fetched subjects","data":{"count":1},"timestamp":1770930593558,"runId":"pre-fix","hypothesisId":"H1"}
