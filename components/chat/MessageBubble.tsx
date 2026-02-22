@@ -1,6 +1,7 @@
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import Markdown from 'react-native-markdown-display';
 
 export type Message = {
   id: string;
@@ -30,15 +31,19 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             ? [styles.sentBubble, isDark ? styles.sentBubbleDark : styles.sentBubbleLight]
             : [styles.receivedBubble, isDark ? styles.receivedBubbleDark : styles.receivedBubbleLight],
         ]}>
-        <Text
-          style={[
-            styles.text,
-            message.isSent
-              ? styles.sentText
-              : [styles.receivedText, isDark ? styles.receivedTextDark : styles.receivedTextLight],
-          ]}>
-          {message.text}
-        </Text>
+          <Markdown
+            style={{
+              body: {
+                fontSize: 16,
+                lineHeight: 21,
+                color: message.isSent
+                  ? '#FFFFFF'
+                  : isDark ? '#FFFFFF' : '#000000',
+              },
+            }}
+          >
+            {message.text}
+          </Markdown>
       </View>
     </View>
   );
