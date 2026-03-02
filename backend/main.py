@@ -1,21 +1,27 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 import ollama
+import json
 import llm_prompts
 from typing import List, Optional
 from contextlib import asynccontextmanager
 
-# Import database functions
 from database import (
-    init_db, 
-    create_subject, 
-    get_all_subjects, 
+    init_db,
+    create_subject,
+    get_all_subjects,
     get_subject_by_id,
     update_subject_progress,
     update_subject_last_message,
-    delete_subject
+    delete_subject,
+    save_curriculum,
+    get_curriculum_by_subject,
+    save_document,
 )
+from rag import ingest_document, retrieve_context, delete_subject_data
+from file_parser import parse_file, SUPPORTED_EXTENSIONS
 
 # Initialize database on startup
 @asynccontextmanager
@@ -48,7 +54,8 @@ class ChatRequest(BaseModel):
     messages: List[Message]
     model: str = "llama3.1:8b"
     subject: Optional[str] = None
-    subject_id: Optional[int] = None  # To update last_message_at
+    subject_id: Optional[int] = None
+    is_new_subject: Optional[bool] = False
 
 class ChatResponse(BaseModel):
     message: str
@@ -68,51 +75,67 @@ class SubjectResponse(BaseModel):
     progress: int
     lastMessage: str
     icon: str
+    is_new_subject: Optional[bool] = False
 
 # ==================== Chat Endpoint ====================
 
-@app.post("/chat", response_model=ChatResponse)
+@app.post("/chat")
 async def chat(request: ChatRequest):
-    try:
-        # Update last_message_at if subject_id provided
-        if request.subject_id:
-            update_subject_last_message(request.subject_id)
-        
-        # Get the appropriate system prompt based on subject
-        subject = request.subject or "default"
-        system_prompt = llm_prompts.SYSTEM_PROMPTS.get(subject.lower(), llm_prompts.SYSTEM_PROMPTS["default"])
-        
-        # Convert messages to Ollama format and add system prompt
-        ollama_messages = [
-            {"role": "system", "content": system_prompt}
-        ]
-        
-        ollama_messages.extend([
-            {"role": msg.role, "content": msg.content} 
-            for msg in request.messages
-        ])
-        
-        # Call Ollama
-        response = ollama.chat(
-            model=request.model,
-            messages=ollama_messages
-        )
-        
-        if request.subject_id: # Test: Update progress by 5 points
-            subject = get_subject_by_id(request.subject_id)
-            if subject:
-                current_progress = subject["progress"]
-                new_progress = min(current_progress + 5, 100)
-                update_subject_progress(request.subject_id, new_progress)
-                print(f"Progress updated: {current_progress} -> {new_progress} for subject {request.subject_id}")
+    if request.subject_id:
+        update_subject_last_message(request.subject_id)
 
-        return ChatResponse(
-            message=response['message']['content'],
-            model=request.model
-        )
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    subject = request.subject or "default"
+    is_first_message = request.is_new_subject and len(request.messages) == 1
+
+    if is_first_message:
+        system_prompt = llm_prompts.INITIALIZING_PROMPT
+    else:
+        system_prompt = llm_prompts.SYSTEM_PROMPTS.get(subject.lower(), llm_prompts.SYSTEM_PROMPTS["default"])
+
+    # RAG: inject relevant context for non-initial messages
+    if not is_first_message and request.subject_id:
+        user_query = request.messages[-1].content if request.messages else ""
+        rag_context = retrieve_context(request.subject_id, user_query)
+        if rag_context:
+            system_prompt += f"\n\nRelevant course material for reference:\n{rag_context}"
+
+    ollama_messages = [{"role": "system", "content": system_prompt}]
+    ollama_messages.extend([
+        {"role": msg.role, "content": msg.content}
+        for msg in request.messages
+    ])
+
+    save_as_curriculum = is_first_message and request.subject_id is not None
+    subject_id_for_save = request.subject_id
+
+    def generate():
+        full_response = ""
+        try:
+            stream = ollama.chat(
+                model=request.model,
+                messages=ollama_messages,
+                stream=True,
+            )
+            for chunk in stream:
+                token = chunk["message"]["content"]
+                full_response += token
+                yield json.dumps({"token": token}) + "\n"
+
+            if subject_id_for_save:
+                subj = get_subject_by_id(subject_id_for_save)
+                if subj:
+                    new_progress = min(subj["progress"] + 5, 100)
+                    update_subject_progress(subject_id_for_save, new_progress)
+
+            # Save curriculum and ingest into RAG when this is the first message
+            if save_as_curriculum and full_response:
+                save_curriculum(subject_id_for_save, full_response)
+                ingest_document(subject_id_for_save, full_response, source_type="curriculum")
+
+        except Exception as e:
+            yield json.dumps({"error": str(e)}) + "\n"
+
+    return StreamingResponse(generate(), media_type="application/x-ndjson")
 
 # ==================== Subject Endpoints ====================
 
@@ -130,6 +153,7 @@ async def add_subject(subject: SubjectCreate):
     """Create a new subject"""
     try:
         new_subject = create_subject(subject.name, subject.icon)
+        new_subject["is_new_subject"] = True
         return new_subject
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -167,11 +191,55 @@ async def update_subject(subject_id: int, update: SubjectUpdate):
 
 @app.delete("/subjects/{subject_id}")
 async def remove_subject(subject_id: int):
-    """Delete a subject"""
+    """Delete a subject and its RAG data"""
     success = delete_subject(subject_id)
     if not success:
         raise HTTPException(status_code=404, detail="Subject not found")
+    delete_subject_data(subject_id)
     return {"message": "Subject deleted successfully"}
+
+# ==================== File Upload Endpoint ====================
+
+@app.post("/subjects/upload", response_model=SubjectResponse)
+async def upload_subject(file: UploadFile = File(...), name: Optional[str] = None):
+    """Create a new subject from an uploaded document (PDF, TXT, DOCX)."""
+    try:
+        file_bytes = await file.read()
+        content = parse_file(file.filename, file_bytes)
+
+        if not content.strip():
+            raise HTTPException(status_code=400, detail="The uploaded file appears to be empty.")
+
+        subject_name = name or file.filename.rsplit(".", 1)[0]
+        new_subject = create_subject(subject_name)
+
+        ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else "unknown"
+        save_document(new_subject["id"], file.filename, content, ext)
+
+        ingest_document(new_subject["id"], content, source_type="document")
+
+        # Generate a curriculum from the file content using the LLM
+        prompt = llm_prompts.FILE_BASED_CURRICULUM_PROMPT.format(
+            document_content=content[:8000]  # cap to avoid exceeding context window
+        )
+        response = ollama.chat(
+            model="llama3.1:8b",
+            messages=[
+                {"role": "system", "content": prompt},
+                {"role": "user", "content": f"Create a study curriculum for: {subject_name}"},
+            ],
+        )
+        curriculum_text = response["message"]["content"]
+
+        save_curriculum(new_subject["id"], curriculum_text)
+        ingest_document(new_subject["id"], curriculum_text, source_type="curriculum")
+
+        new_subject["is_new_subject"] = True
+        return new_subject
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # ==================== Other Endpoints ====================
 

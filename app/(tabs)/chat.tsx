@@ -1,13 +1,13 @@
 import { ChatInput } from '@/components/chat/ChatInput';
 import { LandingPage } from '@/components/chat/LandingPage';
 import { MessageBubble, type Message } from '@/components/chat/MessageBubble';
+import { ThinkingLoader } from '@/components/chat/ThinkingLoader';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useRef, useState } from 'react';
 
 import {
-  ActivityIndicator,
   FlatList,
   Platform,
   StyleSheet,
@@ -32,14 +32,16 @@ interface ChatMessage {
 }
 
 export default function ChatScreen() {
-  const { subjectId, subjectName } = useLocalSearchParams<{
+  const { subjectId, subjectName, isNewSubject } = useLocalSearchParams<{
     subjectId?: string;
     subjectName?: string;
+    isNewSubject?: string;
   }>();
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isFirstMessage, setIsFirstMessage] = useState(isNewSubject === 'true');
   const flatListRef = useRef<FlatList>(null);
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
@@ -58,8 +60,7 @@ export default function ChatScreen() {
   const sendToOllama = async (userMessage: string) => {
     try {
       setIsLoading(true);
-      
-      // Add user message to chat history
+
       const updatedHistory: ChatMessage[] = [
         ...chatHistory,
         { role: 'user', content: userMessage },
@@ -67,49 +68,84 @@ export default function ChatScreen() {
 
       const response = await fetch(`${API_URL}/chat`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: updatedHistory,
           model: 'llama3.1:8b',
           subject: subjectName ?? null,
           subject_id: subjectId ? parseInt(subjectId) : null,
+          is_new_subject: isFirstMessage,
         }),
       });
+
+      if (isFirstMessage) {
+        setIsFirstMessage(false);
+      }
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const data = await response.json();
-      
-      // Update chat history with assistant response
-      const newHistory: ChatMessage[] = [
-        ...updatedHistory,
-        { role: 'assistant', content: data.message },
-      ];
-      setChatHistory(newHistory);
-
-      // Add assistant message to UI
+      const assistantMessageId = Date.now().toString();
       const assistantMessage: Message = {
-        id: Date.now().toString(),
-        text: data.message,
+        id: assistantMessageId,
+        text: '',
         timestamp: new Date(),
         isSent: false,
       };
       setMessages((prev) => [...prev, assistantMessage]);
+      setIsLoading(false);
+
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('No response body');
+
+      const decoder = new TextDecoder();
+      let fullText = '';
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const parsed = JSON.parse(line);
+            if (parsed.error) throw new Error(parsed.error);
+            if (parsed.token) {
+              fullText += parsed.token;
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === assistantMessageId ? { ...msg, text: fullText } : msg,
+                ),
+              );
+            }
+          } catch (e) {
+            if (e instanceof SyntaxError) continue;
+            throw e;
+          }
+        }
+      }
+
+      setChatHistory([
+        ...updatedHistory,
+        { role: 'assistant', content: fullText },
+      ]);
     } catch (error) {
       console.error('Error communicating with Ollama:', error);
-      
-      // Show error message to user
-      const errorMessage: Message = {
-        id: Date.now().toString(),
-        text: `Sorry, I couldn't connect to the AI. Please make sure the backend is running. Error: ${error}`,
-        timestamp: new Date(),
-        isSent: false,
-      };
-      setMessages((prev) => [...prev, errorMessage]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          text: `Sorry, I couldn't connect to the AI. Please make sure the backend is running. Error: ${error}`,
+          timestamp: new Date(),
+          isSent: false,
+        },
+      ]);
     } finally {
       setIsLoading(false);
     }
@@ -166,11 +202,7 @@ export default function ChatScreen() {
             }}
             keyboardShouldPersistTaps="handled"
             ListFooterComponent={
-              isLoading ? (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="small" color="#ffffff" />
-                </View>
-              ) : null
+              isLoading ? <ThinkingLoader /> : null
             }
           />
           <ChatInput onSend={handleSend} />
@@ -194,9 +226,5 @@ const styles = StyleSheet.create({
   listContent: {
     paddingVertical: 12,
     paddingBottom: Platform.OS === 'ios' ? 8 : 12,
-  },
-  loadingContainer: {
-    padding: 16,
-    alignItems: 'flex-start',
   },
 });

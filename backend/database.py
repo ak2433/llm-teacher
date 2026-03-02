@@ -26,10 +26,30 @@ def init_db():
                 icon TEXT DEFAULT '📚'
             )
         """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS curricula (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                subject_id INTEGER NOT NULL,
+                content TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS documents (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                subject_id INTEGER NOT NULL,
+                filename TEXT NOT NULL,
+                content TEXT NOT NULL,
+                file_type TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE
+            )
+        """)
         conn.commit()
-        print("✅ Database initialized successfully")
+        print("Database initialized successfully")
     except Exception as e:
-        print(f"❌ Database initialization failed: {e}")
+        print(f"Database initialization failed: {e}")
         raise
     finally:
         conn.close()
@@ -190,5 +210,86 @@ def delete_subject(subject_id: int) -> bool:
         cursor.execute("DELETE FROM subjects WHERE id = ?", (subject_id,))
         conn.commit()
         return cursor.rowcount > 0
+    finally:
+        conn.close()
+
+# ==================== Curriculum CRUD ====================
+
+def save_curriculum(subject_id: int, content: str) -> Dict:
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO curricula (subject_id, content) VALUES (?, ?)",
+            (subject_id, content)
+        )
+        conn.commit()
+        return {
+            "id": cursor.lastrowid,
+            "subject_id": subject_id,
+            "content": content,
+        }
+    finally:
+        conn.close()
+
+def get_curriculum_by_subject(subject_id: int) -> Optional[Dict]:
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id, subject_id, content, created_at FROM curricula WHERE subject_id = ? ORDER BY created_at DESC LIMIT 1",
+            (subject_id,)
+        )
+        row = cursor.fetchone()
+        if row:
+            return {
+                "id": row["id"],
+                "subject_id": row["subject_id"],
+                "content": row["content"],
+                "created_at": row["created_at"],
+            }
+        return None
+    finally:
+        conn.close()
+
+# ==================== Document CRUD ====================
+
+def save_document(subject_id: int, filename: str, content: str, file_type: str) -> Dict:
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO documents (subject_id, filename, content, file_type) VALUES (?, ?, ?, ?)",
+            (subject_id, filename, content, file_type)
+        )
+        conn.commit()
+        return {
+            "id": cursor.lastrowid,
+            "subject_id": subject_id,
+            "filename": filename,
+            "file_type": file_type,
+        }
+    finally:
+        conn.close()
+
+def get_documents_by_subject(subject_id: int) -> List[Dict]:
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id, subject_id, filename, content, file_type, created_at FROM documents WHERE subject_id = ?",
+            (subject_id,)
+        )
+        return [
+            {
+                "id": row["id"],
+                "subject_id": row["subject_id"],
+                "filename": row["filename"],
+                "content": row["content"],
+                "file_type": row["file_type"],
+                "created_at": row["created_at"],
+            }
+            for row in cursor.fetchall()
+        ]
     finally:
         conn.close()

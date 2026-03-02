@@ -1,18 +1,28 @@
-// ProfileScreen.tsx (or your component file)
-import { styles } from '@/components/profile/_ProfileScreen.styles'; // Import styles
+import { styles } from '@/components/profile/_ProfileScreen.styles';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useRouter } from 'expo-router';
+import * as DocumentPicker from 'expo-document-picker';
 import { StatusBar } from 'expo-status-bar';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
+  Modal,
   Platform,
   ScrollView,
+  StyleSheet as RNStyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+const API_URL = Platform.select({
+  ios: 'http://localhost:8000',
+  android: 'http://10.0.2.2:8000',
+  default: 'http://10.0.0.23:8000',
+});
 
 interface Subject {
   id: string;
@@ -22,7 +32,6 @@ interface Subject {
   progress: number;
 }
 
-// Progress Bar Component
 const ProgressBar = ({ percentage }: { percentage: number }) => {
   return (
     <View style={styles.progressContainer}>
@@ -44,61 +53,33 @@ export default function ProfileScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
   const [isSelectMode, setIsSelectMode] = useState(false);
+  const [showNewSubjectModal, setShowNewSubjectModal] = useState(false);
+  const [newSubjectName, setNewSubjectName] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
   const colorScheme = useColorScheme();
   const textColor = colorScheme === 'dark' ? '#FFFFFF' : '#000000';
   const router = useRouter();
 
-  useEffect(() => {
-    const fetchSubjects = async () => {
-      try {
-        const res = await fetch('http://localhost:8000/subjects');
-        const data = await res.json();
-        // data is an array of { id: number, name, lastMessage, icon, progress }
-        const normalized = data.map((s: any) => ({
-          id: String(s.id), // Subject.id is string in the UI
-          name: s.name,
-          lastMessage: s.lastMessage,
-          icon: s.icon,
-          progress: s.progress,
-        }));
-        setSubjects(normalized);
-
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/c347791d-e2e3-4caf-a07a-d685939d1889', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            location: 'app/(tabs)/profile.tsx:useEffect',
-            message: 'Fetched subjects',
-            data: { count: normalized.length },
-            timestamp: Date.now(),
-            runId: 'pre-fix',
-            hypothesisId: 'H1',
-          }),
-        }).catch(() => {});
-        // #endregion
-      } catch (e) {
-        console.error('Failed to load subjects', e);
-
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/c347791d-e2e3-4caf-a07a-d685939d1889', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            location: 'app/(tabs)/profile.tsx:useEffect',
-            message: 'Failed to fetch subjects',
-            data: { error: String(e) },
-            timestamp: Date.now(),
-            runId: 'pre-fix',
-            hypothesisId: 'H2',
-          }),
-        }).catch(() => {});
-        // #endregion
-      }
-    };
-
-    fetchSubjects();
+  const fetchSubjects = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_URL}/subjects`);
+      const data = await res.json();
+      const normalized = data.map((s: any) => ({
+        id: String(s.id),
+        name: s.name,
+        lastMessage: s.lastMessage,
+        icon: s.icon,
+        progress: s.progress,
+      }));
+      setSubjects(normalized);
+    } catch (e) {
+      console.error('Failed to load subjects', e);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchSubjects();
+  }, [fetchSubjects]);
 
   const filteredSubjects = subjects.filter((subject) =>
     subject.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -119,6 +100,83 @@ export default function ProfileScreen() {
     }
   };
 
+  const handleCreateSubject = async () => {
+    const name = newSubjectName.trim();
+    if (!name) return;
+
+    try {
+      const res = await fetch(`${API_URL}/subjects`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      const created = await res.json();
+      setShowNewSubjectModal(false);
+      setNewSubjectName('');
+
+      router.push({
+        pathname: '/chat',
+        params: {
+          subjectId: String(created.id),
+          subjectName: created.name,
+          isNewSubject: 'true',
+        },
+      });
+    } catch (e) {
+      Alert.alert('Error', 'Failed to create subject. Is the backend running?');
+    }
+  };
+
+  const handleUploadFile = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: [
+          'application/pdf',
+          'text/plain',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        ],
+        copyToCacheDirectory: true,
+      });
+
+      if (result.canceled || !result.assets?.length) return;
+
+      const asset = result.assets[0];
+      setIsUploading(true);
+
+      const formData = new FormData();
+      formData.append('file', {
+        uri: asset.uri,
+        name: asset.name,
+        type: asset.mimeType || 'application/octet-stream',
+      } as any);
+
+      const res = await fetch(`${API_URL}/subjects/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || 'Upload failed');
+      }
+
+      const created = await res.json();
+      setIsUploading(false);
+
+      router.push({
+        pathname: '/chat',
+        params: {
+          subjectId: String(created.id),
+          subjectName: created.name,
+          isNewSubject: 'true',
+        },
+      });
+    } catch (e: any) {
+      setIsUploading(false);
+      Alert.alert('Upload Error', e.message || 'Failed to upload file.');
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar style="light" />
@@ -134,7 +192,7 @@ export default function ProfileScreen() {
           <Text style={styles.headerTitle}>Subjects</Text>
         </View>
 
-        <TouchableOpacity style={styles.newSubjectButton} onPress={() => router.push('/chat')}>
+        <TouchableOpacity style={styles.newSubjectButton} onPress={() => setShowNewSubjectModal(true)}>
           <Text style={styles.plusIcon}>+</Text>
           <Text style={styles.newSubjectText}>New subject</Text>
         </TouchableOpacity>
@@ -185,7 +243,6 @@ export default function ProfileScreen() {
               if (isSelectMode) {
                 toggleSubjectSelection(subject.id);
               } else {
-                console.log('Navigate to subject:', subject.name);
                 router.push({
                   pathname: '/chat',
                   params: { subjectId: subject.id, subjectName: subject.name },
@@ -243,6 +300,121 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* New Subject Modal */}
+      <Modal visible={showNewSubjectModal} transparent animationType="fade">
+        <View style={modalStyles.overlay}>
+          <View style={modalStyles.container}>
+            <Text style={modalStyles.title}>New Subject</Text>
+            <Text style={modalStyles.subtitle}>What would you like to learn?</Text>
+
+            <TextInput
+              style={modalStyles.input}
+              placeholder="e.g. Linear Algebra, World History..."
+              placeholderTextColor="#888"
+              value={newSubjectName}
+              onChangeText={setNewSubjectName}
+              autoFocus
+              onSubmitEditing={handleCreateSubject}
+            />
+
+            <TouchableOpacity style={modalStyles.primaryBtn} onPress={handleCreateSubject}>
+              <Text style={modalStyles.primaryBtnText}>Start Learning</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={modalStyles.secondaryBtn} onPress={handleUploadFile}>
+              {isUploading ? (
+                <ActivityIndicator color="#A78BFA" />
+              ) : (
+                <Text style={modalStyles.secondaryBtnText}>Upload a Document Instead</Text>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={modalStyles.cancelBtn}
+              onPress={() => {
+                setShowNewSubjectModal(false);
+                setNewSubjectName('');
+              }}
+            >
+              <Text style={modalStyles.cancelBtnText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
+
+const modalStyles = RNStyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  container: {
+    width: '100%',
+    maxWidth: 400,
+    backgroundColor: '#2A2A2A',
+    borderRadius: 16,
+    padding: 24,
+  },
+  title: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  subtitle: {
+    color: '#AAA',
+    fontSize: 14,
+    marginBottom: 20,
+  },
+  input: {
+    backgroundColor: '#1A1A1A',
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    color: '#FFF',
+    fontSize: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#444',
+  },
+  primaryBtn: {
+    backgroundColor: '#A78BFA',
+    borderRadius: 10,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  primaryBtnText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  secondaryBtn: {
+    backgroundColor: '#1A1A1A',
+    borderRadius: 10,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#A78BFA',
+  },
+  secondaryBtnText: {
+    color: '#A78BFA',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  cancelBtn: {
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  cancelBtnText: {
+    color: '#888',
+    fontSize: 14,
+  },
+});
