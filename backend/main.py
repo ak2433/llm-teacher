@@ -13,6 +13,7 @@ from database import (
     create_subject,
     get_all_subjects,
     get_subject_by_id,
+    get_subject_by_name,
     update_subject_progress,
     update_subject_last_message,
     delete_subject,
@@ -150,11 +151,19 @@ async def list_subjects():
 
 @app.post("/subjects", response_model=SubjectResponse)
 async def add_subject(subject: SubjectCreate):
-    """Create a new subject"""
+    """Create a new subject, rejecting duplicates with 409."""
     try:
+        existing = get_subject_by_name(subject.name)
+        if existing:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Subject '{existing['name']}' already exists.",
+            )
         new_subject = create_subject(subject.name, subject.icon)
         new_subject["is_new_subject"] = True
         return new_subject
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

@@ -91,6 +91,14 @@ def get_time_ago(timestamp: str) -> str:
 def create_subject(name: str, icon: str = "📚") -> Dict:
     """Create a new subject"""
     conn = get_db_connection()
+    name = name.strip()
+    name = name.lower()
+    if name == "":
+        name = "default"
+        icon = "📚"
+    if icon == "":
+        icon = "📚"
+
     try:
         cursor = conn.cursor()
         cursor.execute(
@@ -107,6 +115,27 @@ def create_subject(name: str, icon: str = "📚") -> Dict:
             "icon": icon,
             "lastMessage": "Just now"
         }
+    finally:
+        conn.close()
+
+def get_subject_by_name(name: str) -> Optional[Dict]:
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id, name, progress, last_message_at, icon FROM subjects WHERE LOWER(name) = LOWER(?)",
+            (name,)
+        )
+        row = cursor.fetchone()
+        if row:
+            return {
+                "id": row["id"],
+                "name": row["name"],
+                "progress": row["progress"],
+                "lastMessage": f"Last session {get_time_ago(row['last_message_at'])}",
+                "icon": row["icon"] or "\U0001f4da"
+            }
+        return None
     finally:
         conn.close()
 

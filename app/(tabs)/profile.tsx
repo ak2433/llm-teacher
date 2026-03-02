@@ -100,28 +100,62 @@ export default function ProfileScreen() {
     }
   };
 
+  const createSubjectAndNavigate = async (name: string) => {
+    const res = await fetch(`${API_URL}/subjects`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    });
+
+    if (res.status === 409) {
+      const data = await res.json();
+      Alert.alert(
+        'Subject Exists',
+        `${data.detail}\n\nWould you like to delete the old one and create a new one?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Replace',
+            style: 'destructive',
+            onPress: async () => {
+              const listRes = await fetch(`${API_URL}/subjects`);
+              const subjects = await listRes.json();
+              const existing = subjects.find(
+                (s: any) => s.name.toLowerCase() === name.toLowerCase(),
+              );
+              if (existing) {
+                await fetch(`${API_URL}/subjects/${existing.id}`, { method: 'DELETE' });
+              }
+              createSubjectAndNavigate(name);
+            },
+          },
+        ],
+      );
+      return;
+    }
+
+    if (!res.ok) throw new Error('Failed to create subject');
+
+    const created = await res.json();
+    setShowNewSubjectModal(false);
+    setNewSubjectName('');
+
+    router.push({
+      pathname: '/chat',
+      params: {
+        subjectId: String(created.id),
+        subjectName: created.name,
+        isNewSubject: 'true',
+      },
+    });
+  };
+
   const handleCreateSubject = async () => {
     const name = newSubjectName.trim();
     if (!name) return;
 
     try {
-      const res = await fetch(`${API_URL}/subjects`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name }),
-      });
-      const created = await res.json();
-      setShowNewSubjectModal(false);
-      setNewSubjectName('');
-
-      router.push({
-        pathname: '/chat',
-        params: {
-          subjectId: String(created.id),
-          subjectName: created.name,
-          isNewSubject: 'true',
-        },
-      });
+      await createSubjectAndNavigate(name);
     } catch (e) {
       Alert.alert('Error', 'Failed to create subject. Is the backend running?');
     }
