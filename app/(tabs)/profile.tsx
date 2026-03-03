@@ -214,124 +214,129 @@ export default function ProfileScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar style="light" />
+      <View style={pageStyles.outerWrapper}>
+        <View style={pageStyles.centeredColumn}>
 
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <TouchableOpacity style={styles.profileButton}>
-            <View style={styles.profileIcon}>
-              <Text style={styles.profileIconText}>JD</Text>
-            </View>
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Subjects</Text>
-        </View>
-
-        <TouchableOpacity style={styles.newSubjectButton} onPress={() => setShowNewSubjectModal(true)}>
-          <Text style={styles.plusIcon}>+</Text>
-          <Text style={styles.newSubjectText}>New subject</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <View style={styles.searchWrapper}>
-          <TextInput
-            style={[
-              styles.searchInput,
-              { color: textColor },
-              Platform.OS === 'web' && { outlineStyle: 'none', boxShadow: 'none' } as any,
-            ]}
-            placeholder="Search your subjects..."
-            placeholderTextColor="#666"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-        </View>
-      </View>
-
-      {/* Subject Count and Select */}
-      <View style={styles.countContainer}>
-        <Text style={styles.countText}>
-          {subjects.length} subjects
-        </Text>
-        <TouchableOpacity onPress={toggleSelectMode}>
-          <Text style={styles.selectText}>
-            {isSelectMode ? 'Cancel' : 'Select'}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Subjects List */}
-      <ScrollView
-        style={styles.subjectsList}
-        contentContainerStyle={styles.subjectsListContent}
-      >
-        {filteredSubjects.map((subject) => (
-          <TouchableOpacity
-            key={subject.id}
-            style={[
-              styles.subjectItem,
-              selectedSubjects.includes(subject.id) && styles.subjectItemSelected,
-            ]}
-            onPress={() => {
-              if (isSelectMode) {
-                toggleSubjectSelection(subject.id);
-              } else {
-                router.push({
-                  pathname: '/chat',
-                  params: { subjectId: subject.id, subjectName: subject.name },
-                });
-              }
-            }}
-          >
-            <View style={styles.subjectIconContainer}>
-              <Text style={styles.subjectIcon}>{subject.icon}</Text>
+          {/* Header */}
+          <View style={styles.header}>
+            <View style={styles.headerLeft}>
+              <TouchableOpacity style={styles.profileButton}>
+                <View style={styles.profileIcon}>
+                  <Text style={styles.profileIconText}>JD</Text>
+                </View>
+              </TouchableOpacity>
+              <Text style={styles.headerTitle}>Subjects</Text>
             </View>
 
-            <View style={styles.subjectInfo}>
-              <Text style={styles.subjectName}>{subject.name}</Text>
-              <Text style={styles.subjectLastMessage}>{subject.lastMessage}</Text>
-            </View>
+            <TouchableOpacity style={styles.newSubjectButton} onPress={() => setShowNewSubjectModal(true)}>
+              <Text style={styles.plusIcon}>+</Text>
+              <Text style={styles.newSubjectText}>New subject</Text>
+            </TouchableOpacity>
+          </View>
 
-            {!isSelectMode && (
-              <ProgressBar percentage={subject.progress} />
-            )}
-
-            {isSelectMode && (
-              <View
+          {/* Search Bar */}
+          <View style={styles.searchContainer}>
+            <View style={styles.searchWrapper}>
+              <TextInput
                 style={[
-                  styles.checkbox,
-                  selectedSubjects.includes(subject.id) && styles.checkboxSelected,
+                  styles.searchInput,
+                  { color: textColor },
+                  Platform.OS === 'web' && { outlineStyle: 'none', boxShadow: 'none' } as any,
                 ]}
+                placeholder="Search your subjects..."
+                placeholderTextColor="#666"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+            </View>
+          </View>
+
+          {/* Subject Count and Select */}
+          <View style={styles.countContainer}>
+            <Text style={styles.countText}>
+              {subjects.length} subjects
+            </Text>
+            <TouchableOpacity onPress={toggleSelectMode}>
+              <Text style={styles.selectText}>
+                {isSelectMode ? 'Cancel' : 'Select'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Subjects List */}
+          <ScrollView
+            style={styles.subjectsList}
+            contentContainerStyle={styles.subjectsListContent}
+          >
+            {filteredSubjects.map((subject) => (
+              <TouchableOpacity
+                key={subject.id}
+                style={[
+                  styles.subjectItem,
+                  selectedSubjects.includes(subject.id) && styles.subjectItemSelected,
+                ]}
+                onPress={() => {
+                  if (isSelectMode) {
+                    toggleSubjectSelection(subject.id);
+                  } else {
+                    router.push({
+                      pathname: '/chat',
+                      params: { subjectId: subject.id, subjectName: subject.name },
+                    });
+                  }
+                }}
               >
-                {selectedSubjects.includes(subject.id) && (
-                  <Text style={styles.checkmark}>✓</Text>
+                <View style={styles.subjectIconContainer}>
+                  <Text style={styles.subjectIcon}>{subject.icon}</Text>
+                </View>
+
+                <View style={styles.subjectInfo}>
+                  <Text style={styles.subjectName}>{subject.name}</Text>
+                  <Text style={styles.subjectLastMessage}>{subject.lastMessage}</Text>
+                </View>
+
+                {!isSelectMode && (
+                  <ProgressBar percentage={subject.progress} />
                 )}
+
+                {isSelectMode && (
+                  <View
+                    style={[
+                      styles.checkbox,
+                      selectedSubjects.includes(subject.id) && styles.checkboxSelected,
+                    ]}
+                  >
+                    {selectedSubjects.includes(subject.id) && (
+                      <Text style={styles.checkmark}>✓</Text>
+                    )}
+                  </View>
+                )}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          {/* Bottom Profile Section */}
+          <View style={styles.bottomProfile}>
+            <View style={styles.profileInfoContainer}>
+              <View style={styles.profileImageLarge}>
+                <Text style={styles.profileImageText}>JD</Text>
               </View>
-            )}
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+              <View style={styles.profileDetails}>
+                <Text style={styles.profileName}>John Doe</Text>
+                <Text style={styles.profileEmail}>john.doe@email.com</Text>
+              </View>
+            </View>
 
-      {/* Bottom Profile Section */}
-      <View style={styles.bottomProfile}>
-        <View style={styles.profileInfoContainer}>
-          <View style={styles.profileImageLarge}>
-            <Text style={styles.profileImageText}>JD</Text>
+            <View style={styles.profileActions}>
+              <TouchableOpacity style={styles.actionButton}>
+                <Text style={styles.actionButtonText}>Edit Profile</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.actionButton, styles.actionButtonSecondary]}>
+                <Text style={styles.actionButtonTextSecondary}>Settings</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-          <View style={styles.profileDetails}>
-            <Text style={styles.profileName}>John Doe</Text>
-            <Text style={styles.profileEmail}>john.doe@email.com</Text>
-          </View>
-        </View>
 
-        <View style={styles.profileActions}>
-          <TouchableOpacity style={styles.actionButton}>
-            <Text style={styles.actionButtonText}>Edit Profile</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.actionButton, styles.actionButtonSecondary]}>
-            <Text style={styles.actionButtonTextSecondary}>Settings</Text>
-          </TouchableOpacity>
         </View>
       </View>
 
@@ -379,6 +384,18 @@ export default function ProfileScreen() {
     </SafeAreaView>
   );
 }
+
+const pageStyles = RNStyleSheet.create({
+  outerWrapper: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  centeredColumn: {
+    flex: 1,
+    width: '100%',
+    maxWidth: 720,
+  },
+});
 
 const modalStyles = RNStyleSheet.create({
   overlay: {

@@ -11,6 +11,8 @@ import {
   FlatList,
   Platform,
   StyleSheet,
+  Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -183,45 +185,108 @@ export default function ChatScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: '#1A1A1A' }]} edges={['top']}>
       <StatusBar style="light" />
+
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.profileBtn} onPress={() => router.push('/profile')}>
+          <View style={styles.profileAvatar}>
+            <Text style={styles.profileAvatarText}>JD</Text>
+          </View>
+        </TouchableOpacity>
+        {subjectName ? (
+          <Text style={styles.headerTitle} numberOfLines={1}>{subjectName}</Text>
+        ) : null}
+      </View>
+
       {showLandingPage ? (
         <View style={styles.landingContainer}>
           <LandingPage onActionPress={handleActionPress} />
-          <ChatInput onSend={handleSend} />
+          <View style={styles.centered}>
+            <ChatInput onSend={handleSend} />
+          </View>
         </View>
       ) : (
         <>
-          <FlatList
-            ref={flatListRef}
-            data={messages}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => <MessageBubble message={item} />}
-            contentContainerStyle={styles.listContent}
-            style={styles.list}
-            onContentSizeChange={() => {
-              flatListRef.current?.scrollToEnd({ animated: true });
-            }}
-            keyboardShouldPersistTaps="handled"
-            ListFooterComponent={
-              isLoading ? <ThinkingLoader /> : null
-            }
-          />
-          <ChatInput onSend={handleSend} />
+          <View style={styles.chatWrapper}>
+            <View style={styles.centered}>
+              <FlatList
+                ref={flatListRef}
+                data={messages}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => <MessageBubble message={item} />}
+                contentContainerStyle={styles.listContent}
+                style={styles.list}
+                onContentSizeChange={() => {
+                  flatListRef.current?.scrollToEnd({ animated: true });
+                }}
+                keyboardShouldPersistTaps="handled"
+                ListFooterComponent={
+                  isLoading ? <ThinkingLoader /> : null
+                }
+              />
+            </View>
+          </View>
+          <View style={styles.centered}>
+            <ChatInput onSend={handleSend} />
+          </View>
         </>
       )}
     </SafeAreaView>
   );
 }
 
+const MAX_CHAT_WIDTH = 720;
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#1A1A1A',
   },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#2C2C2E',
+  },
+  profileBtn: {
+    marginRight: 12,
+  },
+  profileAvatar: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#A78BFA',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  profileAvatarText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  headerTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    flexShrink: 1,
+  },
   landingContainer: {
     flex: 1,
   },
+  chatWrapper: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  centered: {
+    width: '100%',
+    maxWidth: MAX_CHAT_WIDTH,
+    alignSelf: 'center',
+  },
   list: {
     flex: 1,
+    width: '100%',
   },
   listContent: {
     paddingVertical: 12,
