@@ -21,7 +21,6 @@ from database import (
     get_curriculum_by_subject,
     save_document,
 )
-from rag import ingest_document, retrieve_context, delete_subject_data
 from file_parser import parse_file, SUPPORTED_EXTENSIONS
 
 # Initialize database on startup
@@ -93,13 +92,6 @@ async def chat(request: ChatRequest):
     else:
         system_prompt = llm_prompts.SYSTEM_PROMPTS.get(subject.lower(), llm_prompts.SYSTEM_PROMPTS["default"])
 
-    # RAG: inject relevant context for non-initial messages
-    if not is_first_message and request.subject_id:
-        user_query = request.messages[-1].content if request.messages else ""
-        rag_context = retrieve_context(request.subject_id, user_query)
-        if rag_context:
-            system_prompt += f"\n\nRelevant course material for reference:\n{rag_context}"
-
     ollama_messages = [{"role": "system", "content": system_prompt}]
     ollama_messages.extend([
         {"role": msg.role, "content": msg.content}
@@ -128,10 +120,8 @@ async def chat(request: ChatRequest):
                     new_progress = min(subj["progress"] + 5, 100)
                     update_subject_progress(subject_id_for_save, new_progress)
 
-            # Save curriculum and ingest into RAG when this is the first message
             if save_as_curriculum and full_response:
                 save_curriculum(subject_id_for_save, full_response)
-                ingest_document(subject_id_for_save, full_response, source_type="curriculum")
 
         except Exception as e:
             yield json.dumps({"error": str(e)}) + "\n"
@@ -186,7 +176,6 @@ async def update_subject(subject_id: int, update: SubjectUpdate):
                 update.update_timestamp if update.update_timestamp is not None else True
             )
         else:
-            # Just update timestamp
             updated_subject = update_subject_last_message(subject_id)
         
         if not updated_subject:
@@ -200,11 +189,10 @@ async def update_subject(subject_id: int, update: SubjectUpdate):
 
 @app.delete("/subjects/{subject_id}")
 async def remove_subject(subject_id: int):
-    """Delete a subject and its RAG data"""
+    """Delete a subject"""
     success = delete_subject(subject_id)
     if not success:
         raise HTTPException(status_code=404, detail="Subject not found")
-    delete_subject_data(subject_id)
     return {"message": "Subject deleted successfully"}
 
 # ==================== File Upload Endpoint ====================
@@ -225,11 +213,8 @@ async def upload_subject(file: UploadFile = File(...), name: Optional[str] = Non
         ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else "unknown"
         save_document(new_subject["id"], file.filename, content, ext)
 
-        ingest_document(new_subject["id"], content, source_type="document")
-
-        # Generate a curriculum from the file content using the LLM
         prompt = llm_prompts.FILE_BASED_CURRICULUM_PROMPT.format(
-            document_content=content[:8000]  # cap to avoid exceeding context window
+            document_content=content[:8000]
         )
         response = ollama.chat(
             model="llama3.1:8b",
@@ -241,7 +226,6 @@ async def upload_subject(file: UploadFile = File(...), name: Optional[str] = Non
         curriculum_text = response["message"]["content"]
 
         save_curriculum(new_subject["id"], curriculum_text)
-        ingest_document(new_subject["id"], curriculum_text, source_type="curriculum")
 
         new_subject["is_new_subject"] = True
         return new_subject
