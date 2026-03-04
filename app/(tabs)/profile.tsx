@@ -315,28 +315,6 @@ export default function ProfileScreen() {
             ))}
           </ScrollView>
 
-          {/* Bottom Profile Section */}
-          <View style={styles.bottomProfile}>
-            <View style={styles.profileInfoContainer}>
-              <View style={styles.profileImageLarge}>
-                <Text style={styles.profileImageText}>JD</Text>
-              </View>
-              <View style={styles.profileDetails}>
-                <Text style={styles.profileName}>John Doe</Text>
-                <Text style={styles.profileEmail}>john.doe@email.com</Text>
-              </View>
-            </View>
-
-            <View style={styles.profileActions}>
-              <TouchableOpacity style={styles.actionButton}>
-                <Text style={styles.actionButtonText}>Edit Profile</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.actionButton, styles.actionButtonSecondary]}>
-                <Text style={styles.actionButtonTextSecondary}>Settings</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
         </View>
       </View>
 

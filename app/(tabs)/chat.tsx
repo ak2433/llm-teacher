@@ -166,24 +166,8 @@ export default function ChatScreen() {
     await sendToOllama(text);
   };
 
-  const handleActionPress = (actionId: string) => {
-    if (actionId === 'profile') {
-      router.push('/profile');
-      return;
-    }
-
-    const actionPrompts: Record<string, string> = {
-      code: 'Help me with coding',
-      strategize: 'Help me plan and strategize',
-      write: 'Help me write',
-      life: 'Help me with life stuff',
-    };
-    const prompt = actionPrompts[actionId] || 'Help me';
-    handleSend(prompt);
-  };
-
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: '#1A1A1A' }]} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: '#171717' }]} edges={['top']}>
       <StatusBar style="light" />
 
       {/* Header */}
@@ -200,7 +184,7 @@ export default function ChatScreen() {
 
       {showLandingPage ? (
         <View style={styles.landingContainer}>
-          <LandingPage onActionPress={handleActionPress} />
+          <LandingPage />
           <View style={styles.centered}>
             <ChatInput onSend={handleSend} />
           </View>
@@ -240,7 +224,7 @@ const MAX_CHAT_WIDTH = 720;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1A1A1A',
+    backgroundColor: '#171717',
   },
   header: {
     flexDirection: 'row',

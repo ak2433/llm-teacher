@@ -94,8 +94,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   containerDark: {
-    borderTopColor: '#2C2C2E',
-    backgroundColor: '#000000',
+    borderTopColor: 'transparent',
+    backgroundColor: '#171717',
   },
   inputContainer: {
     flexDirection: 'row',
@@ -104,17 +104,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     height: 52,
-    shadowColor: '#000',
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 4,
   },
   inputContainerLight: {
     backgroundColor: '#F2F2F7',
   },
   inputContainerDark: {
-    backgroundColor: '#1E1E1E',
+    backgroundColor: '#262626',
   },
   leftIcon: {
     marginRight: 8,
