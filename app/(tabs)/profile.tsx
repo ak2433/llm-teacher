@@ -21,6 +21,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 const API_URL = Platform.select({
   ios: 'http://localhost:8000',
   android: 'http://10.0.2.2:8000',
+  web: 'http://localhost:8000',
   default: 'http://10.0.0.23:8000',
 });
 
@@ -56,6 +57,8 @@ export default function ProfileScreen() {
   const [showNewSubjectModal, setShowNewSubjectModal] = useState(false);
   const [newSubjectName, setNewSubjectName] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const colorScheme = useColorScheme();
   const textColor = colorScheme === 'dark' ? '#FFFFFF' : '#000000';
   const router = useRouter();
@@ -97,6 +100,37 @@ export default function ProfileScreen() {
       setSelectedSubjects(selectedSubjects.filter((subId) => subId !== id));
     } else {
       setSelectedSubjects([...selectedSubjects, id]);
+    }
+  };
+
+  const handleDeleteSelected = () => {
+    if (selectedSubjects.length === 0) return;
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDeleteSelected = async () => {
+    const idsToDelete = [...selectedSubjects];
+    if (idsToDelete.length === 0) {
+      setShowDeleteConfirm(false);
+      return;
+    }
+    setIsDeleting(true);
+    try {
+      for (const id of idsToDelete) {
+        const res = await fetch(`${API_URL}/subjects/${id}`, { method: 'DELETE' });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.detail || `Delete failed (${res.status})`);
+        }
+      }
+      setSelectedSubjects([]);
+      setIsSelectMode(false);
+      setShowDeleteConfirm(false);
+      await fetchSubjects();
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Failed to delete subjects. Please try again.');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -256,11 +290,26 @@ export default function ProfileScreen() {
             <Text style={styles.countText}>
               {subjects.length} subjects
             </Text>
-            <TouchableOpacity onPress={toggleSelectMode}>
-              <Text style={styles.selectText}>
-                {isSelectMode ? 'Cancel' : 'Select'}
-              </Text>
-            </TouchableOpacity>
+            <View style={pageStyles.selectActions}>
+              {isSelectMode && selectedSubjects.length > 0 && (
+                <TouchableOpacity
+                  onPress={handleDeleteSelected}
+                  disabled={isDeleting}
+                  style={pageStyles.deleteBtn}
+                >
+                  {isDeleting ? (
+                    <ActivityIndicator size="small" color="#EF4444" />
+                  ) : (
+                    <Text style={pageStyles.deleteBtnText}>Delete</Text>
+                  )}
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity onPress={toggleSelectMode}>
+                <Text style={styles.selectText}>
+                  {isSelectMode ? 'Cancel' : 'Select'}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Subjects List */}
@@ -318,6 +367,38 @@ export default function ProfileScreen() {
         </View>
       </View>
 
+      {/* Delete Confirmation Modal */}
+      <Modal visible={showDeleteConfirm} transparent animationType="fade">
+        <View style={modalStyles.overlay}>
+          <View style={modalStyles.container}>
+            <Text style={modalStyles.title}>Delete Subjects</Text>
+            <Text style={modalStyles.subtitle}>
+              Are you sure you want to delete {selectedSubjects.length} subject{selectedSubjects.length > 1 ? 's' : ''}? This cannot be undone.
+            </Text>
+            <View style={modalStyles.deleteModalActions}>
+              <TouchableOpacity
+                style={modalStyles.deleteModalCancelBtn}
+                onPress={() => setShowDeleteConfirm(false)}
+                disabled={isDeleting}
+              >
+                <Text style={modalStyles.cancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={modalStyles.deleteConfirmBtn}
+                onPress={confirmDeleteSelected}
+                disabled={isDeleting}
+              >
+                {isDeleting ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={modalStyles.deleteConfirmBtnText}>Delete</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* New Subject Modal */}
       <Modal visible={showNewSubjectModal} transparent animationType="fade">
         <View style={modalStyles.overlay}>
@@ -372,6 +453,20 @@ const pageStyles = RNStyleSheet.create({
     flex: 1,
     width: '100%',
     maxWidth: 720,
+  },
+  selectActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  deleteBtn: {
+    minWidth: 60,
+    alignItems: 'center',
+  },
+  deleteBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#EF4444',
   },
 });
 
@@ -445,5 +540,34 @@ const modalStyles = RNStyleSheet.create({
   cancelBtnText: {
     color: '#888',
     fontSize: 14,
+  },
+  deleteModalActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  deleteModalCancelBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1A1A1A',
+    borderWidth: 1,
+    borderColor: '#444',
+  },
+  deleteConfirmBtn: {
+    flex: 1,
+    backgroundColor: '#EF4444',
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
+  },
+  deleteConfirmBtnText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
