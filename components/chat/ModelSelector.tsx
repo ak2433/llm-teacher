@@ -1,24 +1,11 @@
 import React from 'react';
-import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { StyleSheet, Text, TouchableOpacity } from 'react-native';
 
+/* UI rules: #212121 surfaces, #ffffff text */
 export function ModelSelector() {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
-
   return (
-    <TouchableOpacity
-      style={[
-        styles.container,
-        isDark ? styles.containerDark : styles.containerLight,
-      ]}>
-      <Text
-        style={[
-          styles.text,
-          isDark ? styles.textDark : styles.textLight,
-        ]}>
-        GPT-4
-      </Text>
+    <TouchableOpacity style={styles.container}>
+      <Text style={styles.text}>GPT-4</Text>
     </TouchableOpacity>
   );
 }
@@ -28,21 +15,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 12,
-  },
-  containerLight: {
-    backgroundColor: '#E5E5EA',
-  },
-  containerDark: {
-    backgroundColor: '#2C2C2E',
+    backgroundColor: '#2d2d2d',
+    borderWidth: 1,
+    borderColor: 'rgb(63, 63, 63)',
   },
   text: {
     fontSize: 12,
     fontWeight: '600',
-  },
-  textLight: {
-    color: '#000000',
-  },
-  textDark: {
-    color: '#FFFFFF',
+    color: '#ffffff',
   },
 });

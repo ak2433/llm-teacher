@@ -1,9 +1,13 @@
-import { StyleSheet } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
+
+/* UI rules: #212121 background, #ffffff text, primary button rgb(0 107 179), messageBox #2d2d2d */
+const PRIMARY_BLUE = '#006BB3';
+const BORDER_LIGHT = 'rgba(255,255,255,0.3)';
 
 export const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#171717',
+    backgroundColor: '#212121',
   },
   header: {
     flexDirection: 'row',
@@ -13,7 +17,7 @@ export const styles = StyleSheet.create({
     paddingTop: 60,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#2A2A2A',
+    borderBottomColor: 'rgb(63, 63, 63)',
   },
   headerLeft: {
     flexDirection: 'row',
@@ -27,51 +31,67 @@ export const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#2872A1',
+    backgroundColor: PRIMARY_BLUE,
     alignItems: 'center',
     justifyContent: 'center',
   },
   profileIconText: {
-    color: '#FFFFFF',
+    color: '#ffffff',
     fontSize: 14,
     fontWeight: '600',
   },
   headerTitle: {
     fontSize: 24,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: '#ffffff',
   },
+  /* Primary/API button – UI rules */
   newSubjectButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    gap: 4,
+    justifyContent: 'center',
+    backgroundColor: PRIMARY_BLUE,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 10,
+    gap: 10,
+    borderWidth: 3,
+    borderColor: BORDER_LIGHT,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.2,
+        shadowRadius: 20,
+      },
+      android: { elevation: 8 },
+    }),
   },
   plusIcon: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#000000',
+    fontWeight: 'bold',
+    color: '#ffffff',
   },
   newSubjectText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#000000',
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#ffffff',
   },
   searchContainer: {
     paddingHorizontal: 16,
     paddingVertical: 16,
   },
+  /* messageBox pattern – UI rules */
   searchWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#2A2A2A',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    backgroundColor: '#2d2d2d',
+    borderRadius: 10,
+    paddingHorizontal: 15,
+    paddingVertical: 10,
     gap: 12,
+    borderWidth: 1,
+    borderColor: 'rgb(63, 63, 63)',
   },
   searchIcon: {
     fontSize: 16,
@@ -90,12 +110,13 @@ export const styles = StyleSheet.create({
   },
   countText: {
     fontSize: 14,
-    color: '#888',
+    color: '#ffffff',
   },
   selectText: {
     fontSize: 14,
-    color: '#2872A1',
-    fontWeight: '500',
+    color: PRIMARY_BLUE,
+    fontWeight: '700',
+    textTransform: 'uppercase',
   },
   subjectsList: {
     flex: 1,
@@ -109,22 +130,11 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#2A2A2A',
+    borderBottomColor: 'rgb(63, 63, 63)',
     gap: 12,
   },
   subjectItemSelected: {
-    backgroundColor: '#2A2A2A',
-  },
-  subjectIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#2A2A2A',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  subjectIcon: {
-    fontSize: 24,
+    backgroundColor: '#2d2d2d',
   },
   subjectInfo: {
     flex: 1,
@@ -132,17 +142,17 @@ export const styles = StyleSheet.create({
   subjectName: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#FFFFFF',
+    color: '#ffffff',
     marginBottom: 4,
   },
   subjectLastMessage: {
     fontSize: 14,
-    color: '#888',
+    color: 'rgb(136, 136, 136)',
   },
   progressContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#2A2A2A',
+    backgroundColor: '#2d2d2d',
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 6,
@@ -152,7 +162,7 @@ export const styles = StyleSheet.create({
   percentageText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: '#ffffff',
     minWidth: 32,
   },
   progressBarBackground: {
@@ -187,7 +197,7 @@ export const styles = StyleSheet.create({
   },
   bottomProfile: {
     borderTopWidth: 1,
-    borderTopColor: '#2A2A2A',
+    borderTopColor: 'rgb(63, 63, 63)',
     paddingHorizontal: 16,
     paddingVertical: 20,
     gap: 16,
@@ -201,7 +211,7 @@ export const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#2872A1',
+    backgroundColor: PRIMARY_BLUE,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -216,12 +226,12 @@ export const styles = StyleSheet.create({
   profileName: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: '#ffffff',
     marginBottom: 4,
   },
   profileEmail: {
     fontSize: 14,
-    color: '#888',
+    color: 'rgb(136, 136, 136)',
   },
   profileActions: {
     flexDirection: 'row',
@@ -229,22 +239,22 @@ export const styles = StyleSheet.create({
   },
   actionButton: {
     flex: 1,
-    backgroundColor: '#2872A1',
+    backgroundColor: PRIMARY_BLUE,
     paddingVertical: 12,
     borderRadius: 8,
     alignItems: 'center',
   },
   actionButtonSecondary: {
-    backgroundColor: '#2872A1',
+    backgroundColor: PRIMARY_BLUE,
   },
   actionButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: '#ffffff',
   },
   actionButtonTextSecondary: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: '#ffffff',
   },
 });

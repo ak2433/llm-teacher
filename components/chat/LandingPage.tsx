@@ -24,10 +24,11 @@ export function LandingPage() {
   );
 }
 
+/* UI rules: #212121 background, #ffffff text, primary #006BB3 */
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#171717',
+    backgroundColor: '#212121',
     paddingTop: 20,
   },
   badgeContainer: {
@@ -38,18 +39,20 @@ const styles = StyleSheet.create({
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#2C2C2E',
+    backgroundColor: '#2d2d2d',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgb(63, 63, 63)',
   },
   badgeText: {
-    color: '#FFFFFF',
+    color: '#ffffff',
     fontSize: 14,
     fontWeight: '500',
   },
   badgeSeparator: {
-    color: '#8E8E93',
+    color: 'rgb(136, 136, 136)',
   },
   badgeLink: {
     textDecorationLine: 'underline',
@@ -65,11 +68,11 @@ const styles = StyleSheet.create({
   },
   welcomeIconText: {
     fontSize: 32,
-    color: '#2872A1',
+    color: '#006BB3',
   },
   welcomeText: {
     fontSize: 32,
     fontWeight: '600',
-    color: '#CBDDE9',
+    color: '#ffffff',
   },
 });

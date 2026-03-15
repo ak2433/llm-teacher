@@ -1,20 +1,19 @@
 import { styles } from '@/components/profile/_ProfileScreen.styles';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
+import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Modal,
-  Platform,
-  ScrollView,
-  StyleSheet as RNStyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    Modal,
+    Platform,
+    StyleSheet as RNStyleSheet,
+    ScrollView,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -29,7 +28,6 @@ interface Subject {
   id: string;
   name: string;
   lastMessage: string;
-  icon: string;
   progress: number;
 }
 
@@ -54,13 +52,9 @@ export default function ProfileScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
   const [isSelectMode, setIsSelectMode] = useState(false);
-  const [showNewSubjectModal, setShowNewSubjectModal] = useState(false);
-  const [newSubjectName, setNewSubjectName] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const colorScheme = useColorScheme();
-  const textColor = colorScheme === 'dark' ? '#FFFFFF' : '#000000';
   const router = useRouter();
 
   const fetchSubjects = useCallback(async () => {
@@ -71,7 +65,6 @@ export default function ProfileScreen() {
         id: String(s.id),
         name: s.name,
         lastMessage: s.lastMessage,
-        icon: s.icon,
         progress: s.progress,
       }));
       setSubjects(normalized);
@@ -131,67 +124,6 @@ export default function ProfileScreen() {
       Alert.alert('Error', e?.message || 'Failed to delete subjects. Please try again.');
     } finally {
       setIsDeleting(false);
-    }
-  };
-
-  const createSubjectAndNavigate = async (name: string) => {
-    const res = await fetch(`${API_URL}/subjects`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name }),
-    });
-
-    if (res.status === 409) {
-      const data = await res.json();
-      Alert.alert(
-        'Subject Exists',
-        `${data.detail}\n\nWould you like to delete the old one and create a new one?`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Replace',
-            style: 'destructive',
-            onPress: async () => {
-              const listRes = await fetch(`${API_URL}/subjects`);
-              const subjects = await listRes.json();
-              const existing = subjects.find(
-                (s: any) => s.name.toLowerCase() === name.toLowerCase(),
-              );
-              if (existing) {
-                await fetch(`${API_URL}/subjects/${existing.id}`, { method: 'DELETE' });
-              }
-              createSubjectAndNavigate(name);
-            },
-          },
-        ],
-      );
-      return;
-    }
-
-    if (!res.ok) throw new Error('Failed to create subject');
-
-    const created = await res.json();
-    setShowNewSubjectModal(false);
-    setNewSubjectName('');
-
-    router.push({
-      pathname: '/chat',
-      params: {
-        subjectId: String(created.id),
-        subjectName: created.name,
-        isNewSubject: 'true',
-      },
-    });
-  };
-
-  const handleCreateSubject = async () => {
-    const name = newSubjectName.trim();
-    if (!name) return;
-
-    try {
-      await createSubjectAndNavigate(name);
-    } catch (e) {
-      Alert.alert('Error', 'Failed to create subject. Is the backend running?');
     }
   };
 
@@ -262,7 +194,7 @@ export default function ProfileScreen() {
               <Text style={styles.headerTitle}>Subjects</Text>
             </View>
 
-            <TouchableOpacity style={styles.newSubjectButton} onPress={() => setShowNewSubjectModal(true)}>
+            <TouchableOpacity style={styles.newSubjectButton} onPress={() => router.push('/new-subject')}>
               <Text style={styles.plusIcon}>+</Text>
               <Text style={styles.newSubjectText}>New subject</Text>
             </TouchableOpacity>
@@ -274,11 +206,11 @@ export default function ProfileScreen() {
               <TextInput
                 style={[
                   styles.searchInput,
-                  { color: textColor },
+                  { color: '#ffffff' },
                   Platform.OS === 'web' && { outlineStyle: 'none', boxShadow: 'none' } as any,
                 ]}
                 placeholder="Search your subjects..."
-                placeholderTextColor="#666"
+                placeholderTextColor="rgb(136, 136, 136)"
                 value={searchQuery}
                 onChangeText={setSearchQuery}
               />
@@ -298,7 +230,7 @@ export default function ProfileScreen() {
                   style={pageStyles.deleteBtn}
                 >
                   {isDeleting ? (
-                    <ActivityIndicator size="small" color="#EF4444" />
+                    <ActivityIndicator size="small" color="#2196f3" />
                   ) : (
                     <Text style={pageStyles.deleteBtnText}>Delete</Text>
                   )}
@@ -335,10 +267,6 @@ export default function ProfileScreen() {
                   }
                 }}
               >
-                <View style={styles.subjectIconContainer}>
-                  <Text style={styles.subjectIcon}>{subject.icon}</Text>
-                </View>
-
                 <View style={styles.subjectInfo}>
                   <Text style={styles.subjectName}>{subject.name}</Text>
                   <Text style={styles.subjectLastMessage}>{subject.lastMessage}</Text>
@@ -399,47 +327,6 @@ export default function ProfileScreen() {
         </View>
       </Modal>
 
-      {/* New Subject Modal */}
-      <Modal visible={showNewSubjectModal} transparent animationType="fade">
-        <View style={modalStyles.overlay}>
-          <View style={modalStyles.container}>
-            <Text style={modalStyles.title}>New Subject</Text>
-            <Text style={modalStyles.subtitle}>What would you like to learn?</Text>
-
-            <TextInput
-              style={modalStyles.input}
-              placeholder="e.g. Linear Algebra, World History..."
-              placeholderTextColor="#888"
-              value={newSubjectName}
-              onChangeText={setNewSubjectName}
-              autoFocus
-              onSubmitEditing={handleCreateSubject}
-            />
-
-            <TouchableOpacity style={modalStyles.primaryBtn} onPress={handleCreateSubject}>
-              <Text style={modalStyles.primaryBtnText}>Start Learning</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={modalStyles.secondaryBtn} onPress={handleUploadFile}>
-              {isUploading ? (
-                <ActivityIndicator color="#A78BFA" />
-              ) : (
-                <Text style={modalStyles.secondaryBtnText}>Upload a Document Instead</Text>
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={modalStyles.cancelBtn}
-              onPress={() => {
-                setShowNewSubjectModal(false);
-                setNewSubjectName('');
-              }}
-            >
-              <Text style={modalStyles.cancelBtnText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 }
@@ -465,11 +352,13 @@ const pageStyles = RNStyleSheet.create({
   },
   deleteBtnText: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#EF4444',
+    textTransform: 'uppercase',
   },
 });
 
+/* Modal styles – UI rules: card #212121, primary #006BB3, secondary transparent */
 const modalStyles = RNStyleSheet.create({
   overlay: {
     flex: 1,
@@ -481,64 +370,70 @@ const modalStyles = RNStyleSheet.create({
   container: {
     width: '100%',
     maxWidth: 400,
-    backgroundColor: '#2A2A2A',
-    borderRadius: 16,
+    backgroundColor: '#212121',
+    borderRadius: 30,
     padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 15, height: 15 },
+    shadowOpacity: 0.5,
+    shadowRadius: 30,
+    elevation: 12,
   },
   title: {
-    color: '#FFFFFF',
+    color: '#ffffff',
     fontSize: 22,
     fontWeight: '700',
     marginBottom: 4,
   },
   subtitle: {
-    color: '#AAA',
+    color: 'rgb(170, 170, 170)',
     fontSize: 14,
     marginBottom: 20,
   },
   input: {
-    backgroundColor: '#1A1A1A',
+    backgroundColor: '#2d2d2d',
     borderRadius: 10,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    color: '#FFF',
+    color: '#ffffff',
     fontSize: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#444',
+    borderColor: 'rgb(63, 63, 63)',
   },
   primaryBtn: {
-    backgroundColor: '#A78BFA',
-    borderRadius: 10,
+    backgroundColor: '#006BB3',
+    borderRadius: 9999,
     paddingVertical: 14,
+    paddingHorizontal: 20,
     alignItems: 'center',
     marginBottom: 10,
+    borderWidth: 3,
+    borderColor: 'rgba(255,255,255,0.3)',
   },
   primaryBtnText: {
-    color: '#FFF',
+    color: '#ffffff',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
   secondaryBtn: {
-    backgroundColor: '#1A1A1A',
-    borderRadius: 10,
+    backgroundColor: 'transparent',
     paddingVertical: 14,
     alignItems: 'center',
     marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#A78BFA',
   },
   secondaryBtnText: {
-    color: '#A78BFA',
+    color: '#ffffff',
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: '700',
+    textTransform: 'uppercase',
   },
   cancelBtn: {
     paddingVertical: 10,
     alignItems: 'center',
   },
   cancelBtnText: {
-    color: '#888',
+    color: 'rgb(136, 136, 136)',
     fontSize: 14,
   },
   deleteModalActions: {
@@ -552,9 +447,9 @@ const modalStyles = RNStyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#1A1A1A',
+    backgroundColor: '#2d2d2d',
     borderWidth: 1,
-    borderColor: '#444',
+    borderColor: 'rgb(63, 63, 63)',
   },
   deleteConfirmBtn: {
     flex: 1,
@@ -566,7 +461,7 @@ const modalStyles = RNStyleSheet.create({
     minHeight: 44,
   },
   deleteConfirmBtnText: {
-    color: '#FFFFFF',
+    color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
   },

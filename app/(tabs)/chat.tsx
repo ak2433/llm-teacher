@@ -2,18 +2,17 @@ import { ChatInput } from '@/components/chat/ChatInput';
 import { LandingPage } from '@/components/chat/LandingPage';
 import { MessageBubble, type Message } from '@/components/chat/MessageBubble';
 import { ThinkingLoader } from '@/components/chat/ThinkingLoader';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useRef, useState } from 'react';
 
 import {
-  FlatList,
-  Platform,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    FlatList,
+    Platform,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -44,11 +43,50 @@ export default function ChatScreen() {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isFirstMessage, setIsFirstMessage] = useState(isNewSubject === 'true');
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const flatListRef = useRef<FlatList>(null);
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
   const showLandingPage = messages.length === 0;
   const router = useRouter();
+
+  // Fetch last 2 message interactions when opening an existing subject
+  useEffect(() => {
+    if (!subjectId || isNewSubject === 'true') {
+      setIsLoadingHistory(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${API_URL}/subjects/${subjectId}/messages?limit=4`);
+        if (!res.ok || cancelled) return;
+        const data = await res.json();
+        const msgs = data.messages || [];
+        if (msgs.length === 0) {
+          setIsLoadingHistory(false);
+          return;
+        }
+        const history: ChatMessage[] = msgs.map((m: { role: string; content: string }) => ({
+          role: m.role as 'user' | 'assistant',
+          content: m.content,
+        }));
+        const uiMessages: Message[] = msgs.map((m: { id: number; role: string; content: string }, i: number) => ({
+          id: `hist-${m.id}-${i}`,
+          text: m.content,
+          timestamp: new Date(),
+          isSent: m.role === 'user',
+        }));
+        if (!cancelled) {
+          setChatHistory(history);
+          setMessages(uiMessages);
+        }
+      } catch {
+        // Ignore fetch errors (e.g. backend offline)
+      } finally {
+        if (!cancelled) setIsLoadingHistory(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [subjectId, isNewSubject]);
 
   useEffect(() => {
     // Scroll to bottom when messages change
@@ -167,7 +205,7 @@ export default function ChatScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: '#171717' }]} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar style="light" />
 
       {/* Header */}
@@ -182,11 +220,20 @@ export default function ChatScreen() {
         ) : null}
       </View>
 
-      {showLandingPage ? (
+      {isLoadingHistory && subjectId && isNewSubject !== 'true' ? (
+        <View style={styles.landingContainer}>
+          <View style={styles.loadingContainer}>
+            <ThinkingLoader />
+          </View>
+          <View style={styles.centered}>
+            <ChatInput onSend={handleSend} onQuizPress={() => handleSend('Quiz me')} />
+          </View>
+        </View>
+      ) : showLandingPage ? (
         <View style={styles.landingContainer}>
           <LandingPage />
           <View style={styles.centered}>
-            <ChatInput onSend={handleSend} />
+            <ChatInput onSend={handleSend} onQuizPress={() => handleSend('Quiz me')} />
           </View>
         </View>
       ) : (
@@ -211,7 +258,7 @@ export default function ChatScreen() {
             </View>
           </View>
           <View style={styles.centered}>
-            <ChatInput onSend={handleSend} />
+            <ChatInput onSend={handleSend} onQuizPress={() => handleSend('Quiz me')} />
           </View>
         </>
       )}
@@ -221,18 +268,19 @@ export default function ChatScreen() {
 
 const MAX_CHAT_WIDTH = 720;
 
+/* UI rules: #212121 background, #ffffff text, primary button #006BB3 */
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#171717',
+    backgroundColor: '#212121',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#2C2C2E',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgb(63, 63, 63)',
   },
   profileBtn: {
     marginRight: 12,
@@ -241,23 +289,28 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: '#A78BFA',
+    backgroundColor: '#006BB3',
     justifyContent: 'center',
     alignItems: 'center',
   },
   profileAvatarText: {
-    color: '#FFFFFF',
+    color: '#ffffff',
     fontSize: 13,
     fontWeight: '700',
   },
   headerTitle: {
-    color: '#FFFFFF',
+    color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
     flexShrink: 1,
   },
   landingContainer: {
     flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   chatWrapper: {
     flex: 1,

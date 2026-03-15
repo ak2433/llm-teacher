@@ -46,6 +46,16 @@ def init_db():
                 FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE
             )
         """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS chat_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                subject_id INTEGER NOT NULL,
+                role TEXT NOT NULL,
+                content TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE
+            )
+        """)
         conn.commit()
         print("Database initialized successfully")
     except Exception as e:
@@ -319,6 +329,54 @@ def get_documents_by_subject(subject_id: int) -> List[Dict]:
                 "created_at": row["created_at"],
             }
             for row in cursor.fetchall()
+        ]
+    finally:
+        conn.close()
+
+# ==================== Chat Messages CRUD ====================
+
+def save_chat_message(subject_id: int, role: str, content: str) -> Dict:
+    """Save a single chat message (user or assistant)"""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO chat_messages (subject_id, role, content) VALUES (?, ?, ?)",
+            (subject_id, role, content)
+        )
+        conn.commit()
+        return {
+            "id": cursor.lastrowid,
+            "subject_id": subject_id,
+            "role": role,
+            "content": content,
+        }
+    finally:
+        conn.close()
+
+def get_chat_messages_by_subject(subject_id: int, limit: int = 4) -> List[Dict]:
+    """Get the last N messages for a subject (chronological order). Default 4 = last 2 interactions."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT id, subject_id, role, content, created_at
+            FROM chat_messages
+            WHERE subject_id = ?
+            ORDER BY id DESC
+            LIMIT ?
+        """, (subject_id, limit))
+        rows = cursor.fetchall()
+        rows = list(reversed(rows))
+        return [
+            {
+                "id": row["id"],
+                "subject_id": row["subject_id"],
+                "role": row["role"],
+                "content": row["content"],
+                "created_at": row["created_at"],
+            }
+            for row in rows
         ]
     finally:
         conn.close()

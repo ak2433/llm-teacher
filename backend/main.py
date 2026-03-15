@@ -20,6 +20,8 @@ from database import (
     save_curriculum,
     get_curriculum_by_subject,
     save_document,
+    save_chat_message,
+    get_chat_messages_by_subject,
 )
 from file_parser import parse_file, SUPPORTED_EXTENSIONS
 
@@ -123,6 +125,12 @@ async def chat(request: ChatRequest):
             if save_as_curriculum and full_response:
                 save_curriculum(subject_id_for_save, full_response)
 
+            # Save chat messages for history (last 2 interactions)
+            if subject_id_for_save and request.messages and full_response:
+                last_user = request.messages[-1]
+                save_chat_message(subject_id_for_save, "user", last_user.content)
+                save_chat_message(subject_id_for_save, "assistant", full_response)
+
         except Exception as e:
             yield json.dumps({"error": str(e)}) + "\n"
 
@@ -164,6 +172,15 @@ async def get_subject(subject_id: int):
     if not subject:
         raise HTTPException(status_code=404, detail="Subject not found")
     return subject
+
+@app.get("/subjects/{subject_id}/messages")
+async def get_subject_messages(subject_id: int, limit: int = 4):
+    """Get the last N messages for a subject (default 4 = last 2 user+assistant interactions)"""
+    subject = get_subject_by_id(subject_id)
+    if not subject:
+        raise HTTPException(status_code=404, detail="Subject not found")
+    messages = get_chat_messages_by_subject(subject_id, limit=limit)
+    return {"messages": messages}
 
 @app.patch("/subjects/{subject_id}", response_model=SubjectResponse)
 async def update_subject(subject_id: int, update: SubjectUpdate):
@@ -251,7 +268,4 @@ async def list_models():
 if __name__ == "__main__":
     import uvicorn
     init_db()
-    for i in range(10):
-        delete_subject(i)
-    create_subject("math", icon="📚")
     uvicorn.run(app, host="0.0.0.0", port=8000)
