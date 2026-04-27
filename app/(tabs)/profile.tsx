@@ -1,4 +1,5 @@
 import { styles } from '@/components/profile/_ProfileScreen.styles';
+import { API_URL } from '@/constants/api';
 import * as DocumentPicker from 'expo-document-picker';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -16,13 +17,6 @@ import {
     View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
-const API_URL = Platform.select({
-  ios: 'http://localhost:8000',
-  android: 'http://10.0.2.2:8000',
-  web: 'http://localhost:8000',
-  default: 'http://10.0.0.23:8000',
-});
 
 interface Subject {
   id: string;

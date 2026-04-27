@@ -4,7 +4,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 import ollama
 import json
-import llm_prompts
+import os
 from typing import List, Optional
 from contextlib import asynccontextmanager
 
@@ -24,6 +24,28 @@ from database import (
     get_chat_messages_by_subject,
 )
 from file_parser import parse_file, SUPPORTED_EXTENSIONS
+
+# Prompts are inlined here for now. When you are ready to use backend/llm_prompts.py again:
+#   import llm_prompts
+#   replace INITIALIZING_PROMPT / SYSTEM_PROMPTS / FILE_BASED_CURRICULUM_PROMPT below with llm_prompts.*
+
+INITIALIZING_PROMPT = """You are an expert curriculum creator. The user has said what they want to learn.
+Create a clear study plan from start to finish: 5–10 modules with titles and what to cover in each.
+Use markdown headings and bullets. Number modules sequentially."""
+
+FILE_BASED_CURRICULUM_PROMPT = """You are an expert curriculum creator. From the document below, create a study curriculum (5–10 modules, markdown headings and bullets). Tailor it to the content.
+
+Document content:
+{document_content}"""
+
+SYSTEM_PROMPTS = {
+    "default": """You are a helpful tutor. Guide the student with clear explanations and questions; be concise and professional.""",
+}
+
+# Ollama model name (must match `ollama pull <name>`). If you see "llama runner process has terminated",
+# try a smaller model, e.g. export OLLAMA_MODEL=llama3.2:3b (then ollama pull llama3.2:3b).
+def default_ollama_model() -> str:
+    return os.environ.get("OLLAMA_MODEL", "llama3.1:8b")
 
 # Initialize database on startup
 @asynccontextmanager
@@ -54,7 +76,7 @@ class Message(BaseModel):
 
 class ChatRequest(BaseModel):
     messages: List[Message]
-    model: str = "llama3.1:8b"
+    model: Optional[str] = None  # falls back to OLLAMA_MODEL env or llama3.1:8b
     subject: Optional[str] = None
     subject_id: Optional[int] = None
     is_new_subject: Optional[bool] = False
@@ -90,9 +112,9 @@ async def chat(request: ChatRequest):
     is_first_message = request.is_new_subject and len(request.messages) == 1
 
     if is_first_message:
-        system_prompt = llm_prompts.INITIALIZING_PROMPT
+        system_prompt = INITIALIZING_PROMPT
     else:
-        system_prompt = llm_prompts.SYSTEM_PROMPTS.get(subject.lower(), llm_prompts.SYSTEM_PROMPTS["default"])
+        system_prompt = SYSTEM_PROMPTS.get(subject.lower(), SYSTEM_PROMPTS["default"])
 
     ollama_messages = [{"role": "system", "content": system_prompt}]
     ollama_messages.extend([
@@ -102,12 +124,13 @@ async def chat(request: ChatRequest):
 
     save_as_curriculum = is_first_message and request.subject_id is not None
     subject_id_for_save = request.subject_id
+    model_name = request.model or default_ollama_model()
 
     def generate():
         full_response = ""
         try:
             stream = ollama.chat(
-                model=request.model,
+                model=model_name,
                 messages=ollama_messages,
                 stream=True,
             )
@@ -230,11 +253,11 @@ async def upload_subject(file: UploadFile = File(...), name: Optional[str] = Non
         ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else "unknown"
         save_document(new_subject["id"], file.filename, content, ext)
 
-        prompt = llm_prompts.FILE_BASED_CURRICULUM_PROMPT.format(
+        prompt = FILE_BASED_CURRICULUM_PROMPT.format(
             document_content=content[:8000]
         )
         response = ollama.chat(
-            model="llama3.1:8b",
+            model=default_ollama_model(),
             messages=[
                 {"role": "system", "content": prompt},
                 {"role": "user", "content": f"Create a study curriculum for: {subject_name}"},

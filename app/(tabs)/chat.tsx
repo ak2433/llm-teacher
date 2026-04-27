@@ -2,6 +2,7 @@ import { ChatInput } from '@/components/chat/ChatInput';
 import { LandingPage } from '@/components/chat/LandingPage';
 import { MessageBubble, type Message } from '@/components/chat/MessageBubble';
 import { ThinkingLoader } from '@/components/chat/ThinkingLoader';
+import { API_URL, EXPO_OLLAMA_MODEL } from '@/constants/api';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useRef, useState } from 'react';
@@ -16,20 +17,29 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-// Configure your FastAPI backend URL
-// For local development:
-// - iOS Simulator: http://localhost:8000
-// - Android Emulator: http://10.0.2.2:8000
-// - Physical device: http://YOUR_COMPUTER_IP:8000
-const API_URL = Platform.select({
-  ios: 'http://localhost:8000',
-  android: 'http://10.0.2.2:8000',
-  default: 'http://10.0.0.23:8000',
-});
-
 interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
+}
+
+function formatChatError(error: unknown): string {
+  const raw = error instanceof Error ? error.message : String(error);
+  if (/llama runner|runner process has terminated|status code:\s*500/i.test(raw)) {
+    return (
+      'The AI model (Ollama) stopped mid-run—often not enough RAM/VRAM for the model. ' +
+      'Try: (1) `ollama pull llama3.2:3b` then set environment variable OLLAMA_MODEL=llama3.2:3b before starting the backend, ' +
+      'or (2) set EXPO_PUBLIC_OLLAMA_MODEL=llama3.2:3b for the app if you only override from the client. ' +
+      'Restart Ollama and the backend. Technical detail: ' +
+      raw
+    );
+  }
+  if (/NetworkError|Failed to fetch|fetch/i.test(raw)) {
+    return (
+      'Could not reach the API. Check that the backend is running and API_URL matches (see constants/api.ts). ' +
+      raw
+    );
+  }
+  return `Something went wrong: ${raw}`;
 }
 
 export default function ChatScreen() {
@@ -106,16 +116,20 @@ export default function ChatScreen() {
         { role: 'user', content: userMessage },
       ];
 
+      const chatPayload: Record<string, unknown> = {
+        messages: updatedHistory,
+        subject: subjectName ?? null,
+        subject_id: subjectId ? parseInt(subjectId) : null,
+        is_new_subject: isFirstMessage,
+      };
+      if (EXPO_OLLAMA_MODEL) {
+        chatPayload.model = EXPO_OLLAMA_MODEL;
+      }
+
       const response = await fetch(`${API_URL}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: updatedHistory,
-          model: 'llama3.1:8b',
-          subject: subjectName ?? null,
-          subject_id: subjectId ? parseInt(subjectId) : null,
-          is_new_subject: isFirstMessage,
-        }),
+        body: JSON.stringify(chatPayload),
       });
 
       if (isFirstMessage) {
@@ -181,7 +195,7 @@ export default function ChatScreen() {
         ...prev,
         {
           id: Date.now().toString(),
-          text: `Sorry, I couldn't connect to the AI. Please make sure the backend is running. Error: ${error}`,
+          text: formatChatError(error),
           timestamp: new Date(),
           isSent: false,
         },
@@ -239,14 +253,17 @@ export default function ChatScreen() {
       ) : (
         <>
           <View style={styles.chatWrapper}>
-            <View style={styles.centered}>
+            <View style={[styles.centered, styles.chatListHost]}>
               <FlatList
                 ref={flatListRef}
                 data={messages}
                 keyExtractor={(item) => item.id}
                 renderItem={({ item }) => <MessageBubble message={item} />}
                 contentContainerStyle={styles.listContent}
-                style={styles.list}
+                style={[styles.list, Platform.OS === 'web' && styles.listWebNoScrollbar]}
+                showsVerticalScrollIndicator={false}
+                showsHorizontalScrollIndicator={false}
+                nestedScrollEnabled
                 onContentSizeChange={() => {
                   flatListRef.current?.scrollToEnd({ animated: true });
                 }}
@@ -314,7 +331,12 @@ const styles = StyleSheet.create({
   },
   chatWrapper: {
     flex: 1,
+    minHeight: 0,
     alignItems: 'center',
+  },
+  chatListHost: {
+    flex: 1,
+    minHeight: 0,
   },
   centered: {
     width: '100%',
@@ -323,8 +345,14 @@ const styles = StyleSheet.create({
   },
   list: {
     flex: 1,
+    minHeight: 0,
     width: '100%',
   },
+  /* Hide scrollbars on web while keeping scroll behavior */
+  listWebNoScrollbar: {
+    scrollbarWidth: 'none',
+    msOverflowStyle: 'none',
+  } as import('react-native').ViewStyle,
   listContent: {
     paddingVertical: 12,
     paddingBottom: Platform.OS === 'ios' ? 8 : 12,
