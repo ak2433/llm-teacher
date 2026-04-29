@@ -22,30 +22,52 @@ from database import (
     save_document,
     save_chat_message,
     get_chat_messages_by_subject,
+    update_subject_quiz_progress,
 )
-from file_parser import parse_file, SUPPORTED_EXTENSIONS
+from file_parser import parse_file
+from llm_prompts import (
+    FILE_BASED_CURRICULUM_PROMPT,
+    INITIALIZING_PROMPT,
+    ROLE_CONTENT_TUTOR,
+    SYSTEM_PROMPTS,
+)
+from syllabus_rag import (
+    format_course_outline,
+    parse_markdown_sections,
+    search_sections,
+    sections_context_for_llm,
+)
+from syllabus_storage import (
+    delete_syllabus_dir,
+    write_syllabus_markdown,
+    read_syllabus_markdown_file,
+    load_quizzes_json,
+    save_quizzes_json,
+)
+from quiz_agents import (
+    QUIZ_PASS_THRESHOLD,
+    eligible_quiz_sections,
+    find_quiz_for_section,
+    generate_quiz_for_section,
+    grade_quiz,
+    strip_quiz_for_client,
+    upsert_quiz,
+)
 
-# Prompts are inlined here for now. When you are ready to use backend/llm_prompts.py again:
-#   import llm_prompts
-#   replace INITIALIZING_PROMPT / SYSTEM_PROMPTS / FILE_BASED_CURRICULUM_PROMPT below with llm_prompts.*
 
-INITIALIZING_PROMPT = """You are an expert curriculum creator. The user has said what they want to learn.
-Create a clear study plan from start to finish: 5–10 modules with titles and what to cover in each.
-Use markdown headings and bullets. Number modules sequentially."""
+def get_syllabus_text(subject_id: int) -> Optional[str]:
+    file_text = read_syllabus_markdown_file(subject_id)
+    if file_text and file_text.strip():
+        return file_text
+    cur = get_curriculum_by_subject(subject_id)
+    if cur and (cur.get("content") or "").strip():
+        return cur["content"]
+    return None
 
-FILE_BASED_CURRICULUM_PROMPT = """You are an expert curriculum creator. From the document below, create a study curriculum (5–10 modules, markdown headings and bullets). Tailor it to the content.
 
-Document content:
-{document_content}"""
-
-SYSTEM_PROMPTS = {
-    "default": """You are a helpful tutor. Guide the student with clear explanations and questions; be concise and professional.""",
-}
-
-# Ollama model name (must match `ollama pull <name>`). If you see "llama runner process has terminated",
-# try a smaller model, e.g. export OLLAMA_MODEL=llama3.2:3b (then ollama pull llama3.2:3b).
 def default_ollama_model() -> str:
     return os.environ.get("OLLAMA_MODEL", "llama3.1:8b")
+
 
 # Initialize database on startup
 @asynccontextmanager
@@ -100,29 +122,70 @@ class SubjectResponse(BaseModel):
     lastMessage: str
     icon: str
     is_new_subject: Optional[bool] = False
+    next_section_index: Optional[int] = None
+
+
+class QuizSubmit(BaseModel):
+    section_id: str
+    answers: List[int]
 
 # ==================== Chat Endpoint ====================
+
+def _build_ollama_messages(
+    request: ChatRequest,
+) -> tuple[List[dict], bool]:
+    """
+    Returns (ollama message list, save_as_curriculum for streamed legacy init path only).
+    """
+    subject = request.subject or "default"
+    subject_id = request.subject_id
+    syllabus = get_syllabus_text(subject_id) if subject_id else None
+    has_syllabus = bool(syllabus and syllabus.strip())
+    is_first = bool(request.is_new_subject and len(request.messages) == 1)
+    legacy_init = is_first and subject_id is not None and not has_syllabus
+    use_tutor = bool(subject_id and has_syllabus and not legacy_init)
+
+    if legacy_init:
+        ollama_messages: List[dict] = [{"role": "system", "content": INITIALIZING_PROMPT}]
+        ollama_messages.extend(
+            {"role": m.role, "content": m.content} for m in request.messages
+        )
+        return ollama_messages, True
+
+    if use_tutor and syllabus is not None:
+        sections = parse_markdown_sections(syllabus)
+        ollama_messages = [{"role": "system", "content": ROLE_CONTENT_TUTOR}]
+        msgs: List[dict] = [{"role": m.role, "content": m.content} for m in request.messages]
+        if msgs and msgs[-1]["role"] == "user":
+            q = msgs[-1]["content"]
+            outline = format_course_outline(sections)
+            chunks = search_sections(q, sections, top_k=5)
+            related = sections_context_for_llm(chunks)
+            msgs[-1]["content"] = (
+                "## Course map (from syllabus — full outline)\n"
+                f"{outline}\n\n"
+                "## Related syllabus excerpts (hints for this question)\n"
+                f"{related}\n\n"
+                "---\n\n"
+                f"Student question:\n{q}"
+            )
+        ollama_messages.extend(msgs)
+        return ollama_messages, False
+
+    system_prompt = SYSTEM_PROMPTS.get(subject.lower(), SYSTEM_PROMPTS["default"])
+    ollama_messages = [{"role": "system", "content": system_prompt}]
+    ollama_messages.extend(
+        {"role": m.role, "content": m.content} for m in request.messages
+    )
+    return ollama_messages, False
+
 
 @app.post("/chat")
 async def chat(request: ChatRequest):
     if request.subject_id:
         update_subject_last_message(request.subject_id)
 
-    subject = request.subject or "default"
-    is_first_message = request.is_new_subject and len(request.messages) == 1
-
-    if is_first_message:
-        system_prompt = INITIALIZING_PROMPT
-    else:
-        system_prompt = SYSTEM_PROMPTS.get(subject.lower(), SYSTEM_PROMPTS["default"])
-
-    ollama_messages = [{"role": "system", "content": system_prompt}]
-    ollama_messages.extend([
-        {"role": msg.role, "content": msg.content}
-        for msg in request.messages
-    ])
-
-    save_as_curriculum = is_first_message and request.subject_id is not None
+    ollama_messages, save_as_curriculum = _build_ollama_messages(request)
     subject_id_for_save = request.subject_id
     model_name = request.model or default_ollama_model()
 
@@ -139,16 +202,10 @@ async def chat(request: ChatRequest):
                 full_response += token
                 yield json.dumps({"token": token}) + "\n"
 
-            if subject_id_for_save:
-                subj = get_subject_by_id(subject_id_for_save)
-                if subj:
-                    new_progress = min(subj["progress"] + 5, 100)
-                    update_subject_progress(subject_id_for_save, new_progress)
-
-            if save_as_curriculum and full_response:
+            if save_as_curriculum and full_response and subject_id_for_save:
                 save_curriculum(subject_id_for_save, full_response)
+                write_syllabus_markdown(subject_id_for_save, full_response)
 
-            # Save chat messages for history (last 2 interactions)
             if subject_id_for_save and request.messages and full_response:
                 last_user = request.messages[-1]
                 save_chat_message(subject_id_for_save, "user", last_user.content)
@@ -172,7 +229,7 @@ async def list_subjects():
 
 @app.post("/subjects", response_model=SubjectResponse)
 async def add_subject(subject: SubjectCreate):
-    """Create a new subject, rejecting duplicates with 409."""
+    """Create a new subject, generate syllabus (markdown) via Ollama, rejecting duplicates with 409."""
     try:
         existing = get_subject_by_name(subject.name)
         if existing:
@@ -181,6 +238,27 @@ async def add_subject(subject: SubjectCreate):
                 detail=f"Subject '{existing['name']}' already exists.",
             )
         new_subject = create_subject(subject.name, subject.icon)
+        user_topic = subject.name.strip() or "this topic"
+        try:
+            response = ollama.chat(
+                model=default_ollama_model(),
+                messages=[
+                    {"role": "system", "content": INITIALIZING_PROMPT},
+                    {"role": "user", "content": f"I want to learn about: {user_topic}"},
+                ],
+            )
+            curriculum_text = (response.get("message") or {}).get("content") or ""
+            if not str(curriculum_text).strip():
+                raise ValueError("Model returned an empty curriculum.")
+            save_curriculum(new_subject["id"], curriculum_text)
+            write_syllabus_markdown(new_subject["id"], curriculum_text)
+        except Exception as e:
+            delete_subject(new_subject["id"])
+            delete_syllabus_dir(new_subject["id"])
+            raise HTTPException(
+                status_code=500,
+                detail=f"Could not generate syllabus: {e!s}",
+            ) from e
         new_subject["is_new_subject"] = True
         return new_subject
     except HTTPException:
@@ -205,22 +283,38 @@ async def get_subject_messages(subject_id: int, limit: int = 4):
     messages = get_chat_messages_by_subject(subject_id, limit=limit)
     return {"messages": messages}
 
+
+@app.get("/subjects/{subject_id}/syllabus/outline")
+async def get_syllabus_outline(subject_id: int):
+    """Raw markdown from ``syllabus.md`` on disk only (``data/syllabi/{id}/syllabus.md``)."""
+    subject = get_subject_by_id(subject_id)
+    if not subject:
+        raise HTTPException(status_code=404, detail="Subject not found")
+    text = read_syllabus_markdown_file(subject_id)
+    if not text or not text.strip():
+        raise HTTPException(
+            status_code=404,
+            detail="No syllabus markdown file found for this subject.",
+        )
+    return {"course_title": subject["name"], "markdown": text}
+
+
 @app.patch("/subjects/{subject_id}", response_model=SubjectResponse)
 async def update_subject(subject_id: int, update: SubjectUpdate):
     """Update subject progress"""
     try:
         if update.progress is not None:
             updated_subject = update_subject_progress(
-                subject_id, 
+                subject_id,
                 update.progress,
                 update.update_timestamp if update.update_timestamp is not None else True
             )
         else:
             updated_subject = update_subject_last_message(subject_id)
-        
+
         if not updated_subject:
             raise HTTPException(status_code=404, detail="Subject not found")
-        
+
         return updated_subject
     except HTTPException:
         raise
@@ -233,6 +327,7 @@ async def remove_subject(subject_id: int):
     success = delete_subject(subject_id)
     if not success:
         raise HTTPException(status_code=404, detail="Subject not found")
+    delete_syllabus_dir(subject_id)
     return {"message": "Subject deleted successfully"}
 
 # ==================== File Upload Endpoint ====================
@@ -266,6 +361,7 @@ async def upload_subject(file: UploadFile = File(...), name: Optional[str] = Non
         curriculum_text = response["message"]["content"]
 
         save_curriculum(new_subject["id"], curriculum_text)
+        write_syllabus_markdown(new_subject["id"], curriculum_text)
 
         new_subject["is_new_subject"] = True
         return new_subject
@@ -273,6 +369,104 @@ async def upload_subject(file: UploadFile = File(...), name: Optional[str] = Non
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/subjects/{subject_id}/quiz/current")
+async def get_current_quiz(subject_id: int):
+    """Quiz for the syllabus section at next_section_index (generated once per section, cached)."""
+    sub = get_subject_by_id(subject_id)
+    if not sub:
+        raise HTTPException(status_code=404, detail="Subject not found")
+    syllabus = get_syllabus_text(subject_id)
+    if not syllabus or not syllabus.strip():
+        raise HTTPException(status_code=400, detail="No syllabus for this subject.")
+    sections = eligible_quiz_sections(syllabus)
+    n = len(sections)
+    if n == 0:
+        raise HTTPException(status_code=400, detail="Could not derive syllabus sections.")
+    idx = int(sub.get("next_section_index") or 0)
+    if idx >= n:
+        return {
+            "completed": True,
+            "progress_percent": sub["progress"],
+            "total_sections": n,
+            "next_section_index": idx,
+            "message": "You've completed all sections.",
+        }
+    sec = sections[idx]
+    quizzes = load_quizzes_json(subject_id)
+    quiz = find_quiz_for_section(quizzes, sec["id"])
+    if quiz is None:
+        try:
+            quiz = generate_quiz_for_section(sec, default_ollama_model())
+            quizzes = upsert_quiz(quizzes, quiz)
+            save_quizzes_json(subject_id, quizzes)
+        except Exception as e:
+            raise HTTPException(status_code=503, detail=f"Could not generate quiz: {e!s}") from e
+    client_quiz = strip_quiz_for_client(quiz)
+    return {
+        "completed": False,
+        "total_sections": n,
+        "section_index": idx,
+        "progress_percent": sub["progress"],
+        "quiz": client_quiz,
+    }
+
+
+@app.post("/subjects/{subject_id}/quiz/submit")
+async def submit_section_quiz(subject_id: int, body: QuizSubmit):
+    """Grade quiz; if score is strictly greater than 75%, advance section cursor and progress bar."""
+    sub = get_subject_by_id(subject_id)
+    if not sub:
+        raise HTTPException(status_code=404, detail="Subject not found")
+    syllabus = get_syllabus_text(subject_id)
+    if not syllabus or not syllabus.strip():
+        raise HTTPException(status_code=400, detail="No syllabus for this subject.")
+    sections = eligible_quiz_sections(syllabus)
+    n = len(sections)
+    if n == 0:
+        raise HTTPException(status_code=400, detail="Could not derive syllabus sections.")
+    idx = int(sub.get("next_section_index") or 0)
+    if idx >= n:
+        raise HTTPException(status_code=400, detail="There is no active quiz.")
+    sec = sections[idx]
+    if body.section_id != sec["id"]:
+        raise HTTPException(status_code=400, detail="Quiz does not match the current section.")
+
+    quizzes = load_quizzes_json(subject_id)
+    quiz = find_quiz_for_section(quizzes, sec["id"])
+    if quiz is None:
+        raise HTTPException(status_code=404, detail="Quiz not found. Open Quiz again.")
+
+    try:
+        pct, correct, total = grade_quiz(quiz, body.answers)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+    advanced = False
+    if pct > QUIZ_PASS_THRESHOLD:
+        new_idx = idx + 1
+        new_progress = min(100, int(100 * new_idx / n))
+        updated = update_subject_quiz_progress(subject_id, new_idx, new_progress)
+        advanced = updated is not None
+        sub = get_subject_by_id(subject_id) or sub
+
+    course_completed = False
+    if advanced and sub:
+        course_completed = int(sub.get("next_section_index") or 0) >= n
+
+    return {
+        "score_percent": round(pct, 2),
+        "correct_count": correct,
+        "total_questions": total,
+        "passed": pct > QUIZ_PASS_THRESHOLD,
+        "advanced_section": advanced,
+        "progress_percent": sub["progress"],
+        "next_section_index": int(sub.get("next_section_index") or idx),
+        "course_completed": course_completed,
+        "total_sections": n,
+    }
+
 
 # ==================== Other Endpoints ====================
 

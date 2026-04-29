@@ -3,13 +3,18 @@ import { LandingPage } from '@/components/chat/LandingPage';
 import { MessageBubble, type Message } from '@/components/chat/MessageBubble';
 import { ThinkingLoader } from '@/components/chat/ThinkingLoader';
 import { API_URL, EXPO_OLLAMA_MODEL } from '@/constants/api';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useRef, useState } from 'react';
 
 import {
+    ActivityIndicator,
+    Alert,
     FlatList,
+    Modal,
     Platform,
+    ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
@@ -52,11 +57,110 @@ export default function ChatScreen() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isFirstMessage, setIsFirstMessage] = useState(isNewSubject === 'true');
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+  const [quizModalVisible, setQuizModalVisible] = useState(false);
+  const [quizLoading, setQuizLoading] = useState(false);
+  const [quizSubmitting, setQuizSubmitting] = useState(false);
+  const [quizPayload, setQuizPayload] = useState<{
+    quiz: {
+      section_id: string;
+      title: string;
+      questions: { question: string; choices: string[] }[];
+    };
+    total_sections: number;
+    section_index: number;
+    progress_percent: number;
+  } | null>(null);
+  const [quizAnswers, setQuizAnswers] = useState<number[]>([]);
   const flatListRef = useRef<FlatList>(null);
   const showLandingPage = messages.length === 0;
   const router = useRouter();
+
+  const openQuizModal = async () => {
+    if (!subjectId) {
+      Alert.alert('Quiz', 'Open a subject chat first.');
+      return;
+    }
+    setQuizModalVisible(true);
+    setQuizLoading(true);
+    setQuizPayload(null);
+    setQuizAnswers([]);
+    try {
+      const res = await fetch(`${API_URL}/subjects/${subjectId}/quiz/current`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(typeof data.detail === 'string' ? data.detail : res.statusText);
+      }
+      if (data.completed) {
+        Alert.alert('Course complete', data.message ?? 'You have finished all syllabus quizzes.');
+        setQuizModalVisible(false);
+        return;
+      }
+      const q = data.quiz;
+      if (!q?.questions?.length) {
+        throw new Error('No quiz questions returned.');
+      }
+      setQuizPayload({
+        quiz: q,
+        total_sections: data.total_sections ?? 1,
+        section_index: data.section_index ?? 0,
+        progress_percent: data.progress_percent ?? 0,
+      });
+      setQuizAnswers(Array(q.questions.length).fill(-1));
+    } catch (e) {
+      Alert.alert('Quiz', formatChatError(e));
+      setQuizModalVisible(false);
+    } finally {
+      setQuizLoading(false);
+    }
+  };
+
+  const selectQuizAnswer = (questionIndex: number, choiceIndex: number) => {
+    setQuizAnswers((prev) => {
+      const next = [...prev];
+      next[questionIndex] = choiceIndex;
+      return next;
+    });
+  };
+
+  const submitQuiz = async () => {
+    if (!subjectId || !quizPayload) return;
+    if (quizAnswers.some((a) => a < 0)) {
+      Alert.alert('Quiz', 'Answer every question before submitting.');
+      return;
+    }
+    setQuizSubmitting(true);
+    try {
+      const res = await fetch(`${API_URL}/subjects/${subjectId}/quiz/submit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          section_id: quizPayload.quiz.section_id,
+          answers: quizAnswers,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(typeof data.detail === 'string' ? data.detail : res.statusText);
+      }
+      const passed = Boolean(data.passed);
+      const score = typeof data.score_percent === 'number' ? data.score_percent : 0;
+      Alert.alert(
+        passed ? 'Passed' : 'Try again',
+        passed
+          ? `Score ${score}%. Progress ${data.progress_percent}%.${
+              data.course_completed ? ' Course complete!' : ''
+            }`
+          : `Score ${score}%. Need above 75% to advance.`,
+      );
+      setQuizModalVisible(false);
+      setQuizPayload(null);
+    } catch (e) {
+      Alert.alert('Quiz', formatChatError(e));
+    } finally {
+      setQuizSubmitting(false);
+    }
+  };
 
   // Fetch last 2 message interactions when opening an existing subject
   useEffect(() => {
@@ -120,7 +224,7 @@ export default function ChatScreen() {
         messages: updatedHistory,
         subject: subjectName ?? null,
         subject_id: subjectId ? parseInt(subjectId) : null,
-        is_new_subject: isFirstMessage,
+        is_new_subject: false,
       };
       if (EXPO_OLLAMA_MODEL) {
         chatPayload.model = EXPO_OLLAMA_MODEL;
@@ -131,10 +235,6 @@ export default function ChatScreen() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(chatPayload),
       });
-
-      if (isFirstMessage) {
-        setIsFirstMessage(false);
-      }
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -222,17 +322,60 @@ export default function ChatScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar style="light" />
 
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.profileBtn} onPress={() => router.push('/profile')}>
-          <View style={styles.profileAvatar}>
-            <Text style={styles.profileAvatarText}>JD</Text>
+      <View style={styles.shell}>
+        <View style={styles.sidebar}>
+          <TouchableOpacity
+            style={styles.sidebarSlot}
+            accessibilityRole="button"
+            accessibilityLabel="Profile"
+            onPress={() => router.push('/profile')}
+          >
+            <View style={styles.profileAvatar}>
+              <Text style={styles.profileAvatarText}>JD</Text>
+            </View>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.sidebarSlot}
+            accessibilityRole="button"
+            accessibilityLabel="Learning focus"
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            activeOpacity={0.7}
+            onPress={() => {}}
+          >
+            <MaterialIcons name="psychology" size={26} color="#ffffff" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.sidebarSlot}
+            accessibilityRole="button"
+            accessibilityLabel="Course outline"
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            activeOpacity={0.7}
+            onPress={() => {
+              if (!subjectId) {
+                Alert.alert('Outline', 'Open a subject chat first.');
+                return;
+              }
+              router.push({
+                pathname: '/syllabus-outline',
+                params: {
+                  subjectId,
+                  subjectName: typeof subjectName === 'string' ? subjectName : '',
+                },
+              });
+            }}
+          >
+            <MaterialIcons name="toc" size={26} color="#ffffff" />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.mainColumn}>
+          <View style={styles.header}>
+            {subjectName ? (
+              <Text style={styles.headerTitle} numberOfLines={1}>{subjectName}</Text>
+            ) : (
+              <Text style={styles.headerTitleMuted}>Chat</Text>
+            )}
           </View>
-        </TouchableOpacity>
-        {subjectName ? (
-          <Text style={styles.headerTitle} numberOfLines={1}>{subjectName}</Text>
-        ) : null}
-      </View>
 
       {isLoadingHistory && subjectId && isNewSubject !== 'true' ? (
         <View style={styles.landingContainer}>
@@ -240,14 +383,14 @@ export default function ChatScreen() {
             <ThinkingLoader />
           </View>
           <View style={styles.centered}>
-            <ChatInput onSend={handleSend} onQuizPress={() => handleSend('Quiz me')} />
+            <ChatInput onSend={handleSend} onQuizPress={openQuizModal} />
           </View>
         </View>
       ) : showLandingPage ? (
         <View style={styles.landingContainer}>
           <LandingPage />
           <View style={styles.centered}>
-            <ChatInput onSend={handleSend} onQuizPress={() => handleSend('Quiz me')} />
+            <ChatInput onSend={handleSend} onQuizPress={openQuizModal} />
           </View>
         </View>
       ) : (
@@ -275,10 +418,83 @@ export default function ChatScreen() {
             </View>
           </View>
           <View style={styles.centered}>
-            <ChatInput onSend={handleSend} onQuizPress={() => handleSend('Quiz me')} />
+            <ChatInput onSend={handleSend} onQuizPress={openQuizModal} />
           </View>
         </>
       )}
+        </View>
+      </View>
+
+      <Modal
+        visible={quizModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => !quizSubmitting && setQuizModalVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Section quiz</Text>
+            {quizLoading ? (
+              <View style={styles.modalLoading}>
+                <ActivityIndicator color="#006BB3" size="large" />
+                <Text style={styles.modalHint}>Generating quiz…</Text>
+              </View>
+            ) : quizPayload ? (
+              <>
+                <Text style={styles.modalSectionTitle} numberOfLines={2}>
+                  {quizPayload.quiz.title}
+                </Text>
+                <Text style={styles.modalMeta}>
+                  Section {quizPayload.section_index + 1} of {quizPayload.total_sections}
+                  {' · Progress '}
+                  {quizPayload.progress_percent}%
+                </Text>
+                <ScrollView style={styles.modalScroll} keyboardShouldPersistTaps="handled">
+                  {quizPayload.quiz.questions.map((q, qi) => (
+                    <View key={`q-${qi}`} style={styles.questionBlock}>
+                      <Text style={styles.questionText}>{q.question}</Text>
+                      {q.choices.map((choice, ci) => {
+                        const selected = quizAnswers[qi] === ci;
+                        return (
+                          <TouchableOpacity
+                            key={`c-${qi}-${ci}`}
+                            style={[styles.choiceRow, selected && styles.choiceRowSelected]}
+                            onPress={() => selectQuizAnswer(qi, ci)}
+                          >
+                            <Text style={styles.choiceLetter}>{String.fromCharCode(65 + ci)}.</Text>
+                            <Text style={styles.choiceText}>{choice}</Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  ))}
+                </ScrollView>
+                <View style={styles.modalActions}>
+                  <TouchableOpacity
+                    style={styles.modalBtnSecondary}
+                    onPress={() => !quizSubmitting && setQuizModalVisible(false)}
+                  >
+                    <Text style={styles.modalBtnSecondaryText}>Close</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.modalBtnPrimary, quizSubmitting && styles.modalBtnDisabled]}
+                    onPress={submitQuiz}
+                    disabled={quizSubmitting}
+                  >
+                    {quizSubmitting ? (
+                      <ActivityIndicator color="#ffffff" />
+                    ) : (
+                      <Text style={styles.modalBtnPrimaryText}>Submit</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </>
+            ) : (
+              <Text style={styles.modalHint}>No quiz loaded.</Text>
+            )}
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -291,6 +507,32 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#212121',
   },
+  shell: {
+    flex: 1,
+    flexDirection: 'row',
+    minHeight: 0,
+  },
+  sidebar: {
+    width: 52,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderRightWidth: 1,
+    borderRightColor: 'rgb(63, 63, 63)',
+    backgroundColor: '#212121',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    gap: 14,
+  },
+  sidebarSlot: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 40,
+  },
+  mainColumn: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 0,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -298,9 +540,6 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: 'rgb(63, 63, 63)',
-  },
-  profileBtn: {
-    marginRight: 12,
   },
   profileAvatar: {
     width: 34,
@@ -317,6 +556,12 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+    flexShrink: 1,
+  },
+  headerTitleMuted: {
+    color: '#888888',
     fontSize: 16,
     fontWeight: '600',
     flexShrink: 1,
@@ -356,5 +601,117 @@ const styles = StyleSheet.create({
   listContent: {
     paddingVertical: 12,
     paddingBottom: Platform.OS === 'ios' ? 8 : 12,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    justifyContent: 'center',
+    padding: 16,
+  },
+  modalCard: {
+    backgroundColor: '#2d2d2d',
+    borderRadius: 12,
+    maxHeight: '88%',
+    padding: 16,
+    width: '100%',
+    maxWidth: MAX_CHAT_WIDTH,
+    alignSelf: 'center',
+  },
+  modalTitle: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  modalSectionTitle: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  modalMeta: {
+    color: '#cccccc',
+    fontSize: 13,
+    marginBottom: 12,
+  },
+  modalScroll: {
+    maxHeight: 420,
+    marginBottom: 12,
+  },
+  modalLoading: {
+    paddingVertical: 24,
+    alignItems: 'center',
+    gap: 12,
+  },
+  modalHint: {
+    color: '#cccccc',
+    fontSize: 14,
+  },
+  questionBlock: {
+    marginBottom: 18,
+  },
+  questionText: {
+    color: '#ffffff',
+    fontSize: 15,
+    marginBottom: 10,
+    fontWeight: '600',
+  },
+  choiceRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginBottom: 6,
+    backgroundColor: '#212121',
+    borderWidth: 1,
+    borderColor: '#3f3f3f',
+  },
+  choiceRowSelected: {
+    borderColor: '#006BB3',
+    backgroundColor: '#1a3d52',
+  },
+  choiceLetter: {
+    color: '#ffffff',
+    fontWeight: '700',
+    width: 28,
+    marginRight: 8,
+  },
+  choiceText: {
+    color: '#ffffff',
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 12,
+    marginTop: 4,
+  },
+  modalBtnSecondary: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+  modalBtnSecondaryText: {
+    color: '#cccccc',
+    fontSize: 16,
+  },
+  modalBtnPrimary: {
+    backgroundColor: '#006BB3',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    minWidth: 100,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalBtnPrimaryText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalBtnDisabled: {
+    opacity: 0.6,
   },
 });

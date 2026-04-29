@@ -56,6 +56,12 @@ def init_db():
                 FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE
             )
         """)
+        try:
+            cursor.execute(
+                "ALTER TABLE subjects ADD COLUMN next_section_index INTEGER NOT NULL DEFAULT 0"
+            )
+        except sqlite3.OperationalError:
+            pass
         conn.commit()
         print("Database initialized successfully")
     except Exception as e:
@@ -123,7 +129,8 @@ def create_subject(name: str, icon: str = "📚") -> Dict:
             "name": name,
             "progress": 0,
             "icon": icon,
-            "lastMessage": "Just now"
+            "lastMessage": "Just now",
+            "next_section_index": 0,
         }
     finally:
         conn.close()
@@ -133,7 +140,8 @@ def get_subject_by_name(name: str) -> Optional[Dict]:
     try:
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT id, name, progress, last_message_at, icon FROM subjects WHERE LOWER(name) = LOWER(?)",
+            "SELECT id, name, progress, last_message_at, icon, "
+            "COALESCE(next_section_index, 0) AS next_section_index FROM subjects WHERE LOWER(name) = LOWER(?)",
             (name,)
         )
         row = cursor.fetchone()
@@ -143,7 +151,8 @@ def get_subject_by_name(name: str) -> Optional[Dict]:
                 "name": row["name"],
                 "progress": row["progress"],
                 "lastMessage": f"Last session {get_time_ago(row['last_message_at'])}",
-                "icon": row["icon"] or "\U0001f4da"
+                "icon": row["icon"] or "\U0001f4da",
+                "next_section_index": row["next_section_index"],
             }
         return None
     finally:
@@ -155,7 +164,8 @@ def get_all_subjects() -> List[Dict]:
     try:
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT id, name, progress, last_message_at, icon, created_at 
+            SELECT id, name, progress, last_message_at, icon, created_at,
+                   COALESCE(next_section_index, 0) AS next_section_index
             FROM subjects 
             ORDER BY last_message_at DESC, created_at DESC
         """)
@@ -167,7 +177,8 @@ def get_all_subjects() -> List[Dict]:
                 "name": row["name"],
                 "progress": row["progress"],
                 "lastMessage": f"Last session {get_time_ago(row['last_message_at'])}",
-                "icon": row["icon"] or "📚"
+                "icon": row["icon"] or "📚",
+                "next_section_index": row["next_section_index"],
             })
         
         return subjects
@@ -180,7 +191,8 @@ def get_subject_by_id(subject_id: int) -> Optional[Dict]:
     try:
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT id, name, progress, last_message_at, icon FROM subjects WHERE id = ?",
+            "SELECT id, name, progress, last_message_at, icon, "
+            "COALESCE(next_section_index, 0) AS next_section_index FROM subjects WHERE id = ?",
             (subject_id,)
         )
         row = cursor.fetchone()
@@ -191,9 +203,38 @@ def get_subject_by_id(subject_id: int) -> Optional[Dict]:
                 "name": row["name"],
                 "progress": row["progress"],
                 "lastMessage": f"Last session {get_time_ago(row['last_message_at'])}",
-                "icon": row["icon"] or "📚"
+                "icon": row["icon"] or "📚",
+                "next_section_index": row["next_section_index"],
             }
         return None
+    finally:
+        conn.close()
+
+def update_subject_quiz_progress(
+    subject_id: int,
+    next_section_index: int,
+    progress_percent: int,
+    update_timestamp: bool = True,
+) -> Optional[Dict]:
+    """Set quiz cursor and bar progress together (quiz pass path)."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        pct = max(0, min(100, progress_percent))
+        if update_timestamp:
+            cursor.execute(
+                "UPDATE subjects SET next_section_index = ?, progress = ?, last_message_at = ? WHERE id = ?",
+                (next_section_index, pct, datetime.now().isoformat(), subject_id),
+            )
+        else:
+            cursor.execute(
+                "UPDATE subjects SET next_section_index = ?, progress = ? WHERE id = ?",
+                (next_section_index, pct, subject_id),
+            )
+        conn.commit()
+        if cursor.rowcount == 0:
+            return None
+        return get_subject_by_id(subject_id)
     finally:
         conn.close()
 

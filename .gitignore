@@ -33,6 +33,9 @@ yarn-error.*
 # local env files
 .env*.local
 
+# Local syllabus markdown per subject
+backend/data/syllabi/
+
 # typescript
 *.tsbuildinfo
 
