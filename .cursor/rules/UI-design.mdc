@@ -5,12 +5,12 @@ alwaysApply: true
 - **Primary blue:** `#006BB3` (rgb(0, 107, 179)) – primary buttons, links, accents.
 
 ## Background & Typography
-- Background: use `#212121` for primary surfaces.
+- Background: use `#000000` for primary surfaces.
 - Text: use pure white text (`#ffffff`) with a Garamond serif font stack, applied globally where possible.
 
 ```css
 body {
-  background-color: #212121;
+  background-color: #000000;
   color: #ffffff;
 }
 ```
@@ -138,7 +138,7 @@ body {
   width: 190px;
   height: 254px;
   border-radius: 30px;
-  background: #212121;
+  background: #000000;
   box-shadow: 15px 15px 30px rgb(25, 25, 25),
     -15px -15px 30px rgb(60, 60, 60);
 }

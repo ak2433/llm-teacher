@@ -36,7 +36,7 @@ export function LandingPage({ courseTitle }: LandingPageProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#212121',
+    backgroundColor: '#000000',
     paddingTop: 20,
   },
   badgeContainer: {

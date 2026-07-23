@@ -206,7 +206,7 @@ export default function NewSubjectScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#212121',
+    backgroundColor: '#000000',
     position: 'relative',
   },
   scrollContent: {

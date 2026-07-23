@@ -1,9 +1,10 @@
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Animated,
+  Image,
+  ImageSourcePropType,
   Pressable,
   StyleSheet,
   Text,
@@ -12,6 +13,23 @@ import {
 } from 'react-native';
 
 const DRAWER_WIDTH = 280;
+
+const NAV_ICONS = {
+  subject: require('@/icons/subject.png'),
+  syllabus: require('@/icons/syllabus.png'),
+  profile: require('@/icons/backlink.png'),
+} as const satisfies Record<string, ImageSourcePropType>;
+
+function NavIcon({ source, size = 28 }: { source: ImageSourcePropType; size?: number }) {
+  return (
+    <Image
+      source={source}
+      style={{ width: size, height: size }}
+      resizeMode="contain"
+      accessibilityIgnoresInvertColors
+    />
+  );
+}
 
 type AppNavMenuProps = {
   subjectId?: string;
@@ -100,9 +118,7 @@ export function AppNavMenu({ subjectId, subjectName }: AppNavMenuProps) {
           pointerEvents={navMenuOpen ? 'auto' : 'none'}
         >
           <View style={styles.drawerProfileRow}>
-            <View style={styles.drawerProfileAvatar}>
-              <Text style={styles.profileAvatarText}>JD</Text>
-            </View>
+            <NavIcon source={NAV_ICONS.profile} size={44} />
             <Text style={styles.drawerProfileName}>John Doe</Text>
           </View>
           <View style={styles.drawerDivider} />
@@ -112,7 +128,7 @@ export function AppNavMenu({ subjectId, subjectName }: AppNavMenuProps) {
             accessibilityRole="button"
             accessibilityLabel="Subjects"
           >
-            <MaterialIcons name="grid-view" size={24} color="#ffffff" />
+            <NavIcon source={NAV_ICONS.subject} />
             <Text style={styles.drawerItemLabel}>Subjects</Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -121,7 +137,7 @@ export function AppNavMenu({ subjectId, subjectName }: AppNavMenuProps) {
             accessibilityRole="button"
             accessibilityLabel="Syllabus"
           >
-            <MaterialIcons name="toc" size={24} color="#ffffff" />
+            <NavIcon source={NAV_ICONS.syllabus} />
             <Text style={styles.drawerItemLabel}>Syllabus</Text>
           </TouchableOpacity>
         </Animated.View>
@@ -166,7 +182,7 @@ const styles = StyleSheet.create({
     left: 0,
     bottom: 0,
     width: DRAWER_WIDTH,
-    backgroundColor: '#212121',
+    backgroundColor: '#000000',
     paddingTop: 56,
     paddingHorizontal: 20,
     borderRightWidth: StyleSheet.hairlineWidth,
@@ -177,19 +193,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 14,
     marginBottom: 20,
-  },
-  drawerProfileAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#006BB3',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  profileAvatarText: {
-    color: '#ffffff',
-    fontSize: 13,
-    fontWeight: '700',
   },
   drawerProfileName: {
     flex: 1,

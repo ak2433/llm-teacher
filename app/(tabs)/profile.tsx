@@ -362,7 +362,7 @@ const modalStyles = RNStyleSheet.create({
   container: {
     width: '100%',
     maxWidth: 400,
-    backgroundColor: '#212121',
+    backgroundColor: '#000000',
     borderRadius: 30,
     padding: 24,
     shadowColor: '#000',

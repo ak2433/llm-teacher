@@ -7,7 +7,7 @@ const BORDER_LIGHT = 'rgba(255,255,255,0.3)';
 export const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#212121',
+    backgroundColor: '#000000',
   },
   header: {
     flexDirection: 'row',

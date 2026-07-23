@@ -158,7 +158,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingTop: 10,
     paddingBottom: 30,
-    backgroundColor: '#212121',
+    backgroundColor: '#000000',
   },
   messageBox: {
     flexDirection: 'row',

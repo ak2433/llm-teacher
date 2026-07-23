@@ -457,7 +457,7 @@ export default function ChatScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#212121',
+    backgroundColor: '#000000',
     position: 'relative',
   },
   shell: {
@@ -567,7 +567,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 8,
     marginBottom: 6,
-    backgroundColor: '#212121',
+    backgroundColor: '#1a1a1a',
     borderWidth: 1,
     borderColor: '#3f3f3f',
   },
