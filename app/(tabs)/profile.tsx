@@ -1,4 +1,5 @@
 import { styles } from '@/components/profile/_ProfileScreen.styles';
+import { AppNavMenu } from '@/components/navigation/AppNavMenu';
 import { API_URL } from '@/constants/api';
 import * as DocumentPicker from 'expo-document-picker';
 import { useRouter } from 'expo-router';
@@ -172,21 +173,15 @@ export default function ProfileScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, pageStyles.navHost]} edges={['top']}>
       <StatusBar style="light" />
+      <AppNavMenu />
       <View style={pageStyles.outerWrapper}>
         <View style={pageStyles.centeredColumn}>
 
           {/* Header */}
           <View style={styles.header}>
-            <View style={styles.headerLeft}>
-              <TouchableOpacity style={styles.profileButton}>
-                <View style={styles.profileIcon}>
-                  <Text style={styles.profileIconText}>JD</Text>
-                </View>
-              </TouchableOpacity>
-              <Text style={styles.headerTitle}>Subjects</Text>
-            </View>
+            <Text style={styles.headerTitle}>Subjects</Text>
 
             <TouchableOpacity style={styles.newSubjectButton} onPress={() => router.push('/new-subject')}>
               <Text style={styles.plusIcon}>+</Text>
@@ -326,6 +321,9 @@ export default function ProfileScreen() {
 }
 
 const pageStyles = RNStyleSheet.create({
+  navHost: {
+    position: 'relative',
+  },
   outerWrapper: {
     flex: 1,
     alignItems: 'center',

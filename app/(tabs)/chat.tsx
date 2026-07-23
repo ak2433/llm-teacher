@@ -2,9 +2,9 @@ import { ChatInput } from '@/components/chat/ChatInput';
 import { LandingPage } from '@/components/chat/LandingPage';
 import { MessageBubble, type Message } from '@/components/chat/MessageBubble';
 import { ThinkingLoader } from '@/components/chat/ThinkingLoader';
+import { AppNavMenu } from '@/components/navigation/AppNavMenu';
 import { API_URL, EXPO_OLLAMA_MODEL } from '@/constants/api';
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useRef, useState } from 'react';
 
@@ -47,6 +47,8 @@ function formatChatError(error: unknown): string {
   return `Something went wrong: ${raw}`;
 }
 
+const MAX_CHAT_WIDTH = 720;
+
 export default function ChatScreen() {
   const { subjectId, subjectName, isNewSubject } = useLocalSearchParams<{
     subjectId?: string;
@@ -74,7 +76,6 @@ export default function ChatScreen() {
   const [quizAnswers, setQuizAnswers] = useState<number[]>([]);
   const flatListRef = useRef<FlatList>(null);
   const showLandingPage = messages.length === 0;
-  const router = useRouter();
 
   const openQuizModal = async () => {
     if (!subjectId) {
@@ -321,62 +322,13 @@ export default function ChatScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar style="light" />
+      <AppNavMenu
+        subjectId={subjectId}
+        subjectName={typeof subjectName === 'string' ? subjectName : undefined}
+      />
 
       <View style={styles.shell}>
-        <View style={styles.sidebar}>
-          <TouchableOpacity
-            style={styles.sidebarSlot}
-            accessibilityRole="button"
-            accessibilityLabel="Profile"
-            onPress={() => router.push('/profile')}
-          >
-            <View style={styles.profileAvatar}>
-              <Text style={styles.profileAvatarText}>JD</Text>
-            </View>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.sidebarSlot}
-            accessibilityRole="button"
-            accessibilityLabel="Learning focus"
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            activeOpacity={0.7}
-            onPress={() => {}}
-          >
-            <MaterialIcons name="psychology" size={26} color="#ffffff" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.sidebarSlot}
-            accessibilityRole="button"
-            accessibilityLabel="Course outline"
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            activeOpacity={0.7}
-            onPress={() => {
-              if (!subjectId) {
-                Alert.alert('Outline', 'Open a subject chat first.');
-                return;
-              }
-              router.push({
-                pathname: '/syllabus-outline',
-                params: {
-                  subjectId,
-                  subjectName: typeof subjectName === 'string' ? subjectName : '',
-                },
-              });
-            }}
-          >
-            <MaterialIcons name="toc" size={26} color="#ffffff" />
-          </TouchableOpacity>
-        </View>
-
         <View style={styles.mainColumn}>
-          <View style={styles.header}>
-            {subjectName ? (
-              <Text style={styles.headerTitle} numberOfLines={1}>{subjectName}</Text>
-            ) : (
-              <Text style={styles.headerTitleMuted}>Chat</Text>
-            )}
-          </View>
-
       {isLoadingHistory && subjectId && isNewSubject !== 'true' ? (
         <View style={styles.landingContainer}>
           <View style={styles.loadingContainer}>
@@ -388,7 +340,9 @@ export default function ChatScreen() {
         </View>
       ) : showLandingPage ? (
         <View style={styles.landingContainer}>
-          <LandingPage />
+          <LandingPage
+            courseTitle={typeof subjectName === 'string' ? subjectName : undefined}
+          />
           <View style={styles.centered}>
             <ChatInput onSend={handleSend} onQuizPress={openQuizModal} />
           </View>
@@ -499,72 +453,22 @@ export default function ChatScreen() {
   );
 }
 
-const MAX_CHAT_WIDTH = 720;
-
 /* UI rules: #212121 background, #ffffff text, primary button #006BB3 */
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#212121',
+    position: 'relative',
   },
   shell: {
     flex: 1,
-    flexDirection: 'row',
     minHeight: 0,
-  },
-  sidebar: {
-    width: 52,
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderRightWidth: 1,
-    borderRightColor: 'rgb(63, 63, 63)',
-    backgroundColor: '#212121',
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    gap: 14,
-  },
-  sidebarSlot: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 40,
   },
   mainColumn: {
     flex: 1,
     minWidth: 0,
     minHeight: 0,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgb(63, 63, 63)',
-  },
-  profileAvatar: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: '#006BB3',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  profileAvatarText: {
-    color: '#ffffff',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  headerTitle: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
-    flexShrink: 1,
-  },
-  headerTitleMuted: {
-    color: '#888888',
-    fontSize: 16,
-    fontWeight: '600',
-    flexShrink: 1,
+    width: '100%',
   },
   landingContainer: {
     flex: 1,

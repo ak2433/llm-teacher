@@ -110,6 +110,7 @@ class ChatResponse(BaseModel):
 class SubjectCreate(BaseModel):
     name: str
     icon: Optional[str] = "📚"
+    additional_context: Optional[str] = None
 
 class SubjectUpdate(BaseModel):
     progress: Optional[int] = None
@@ -239,12 +240,18 @@ async def add_subject(subject: SubjectCreate):
             )
         new_subject = create_subject(subject.name, subject.icon)
         user_topic = subject.name.strip() or "this topic"
+        user_content = f"I want to learn about: {user_topic}"
+        if subject.additional_context and subject.additional_context.strip():
+            user_content += (
+                "\n\nAdditional context or lens for this course:\n"
+                f"{subject.additional_context.strip()}"
+            )
         try:
             response = ollama.chat(
                 model=default_ollama_model(),
                 messages=[
                     {"role": "system", "content": INITIALIZING_PROMPT},
-                    {"role": "user", "content": f"I want to learn about: {user_topic}"},
+                    {"role": "user", "content": user_content},
                 ],
             )
             curriculum_text = (response.get("message") or {}).get("content") or ""

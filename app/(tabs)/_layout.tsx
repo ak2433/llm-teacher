@@ -11,6 +11,7 @@ export default function TabLayout() {
 
   return (
     <Tabs
+      initialRouteName="profile"
       screenOptions={{
         tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
         headerShown: false,
@@ -18,17 +19,17 @@ export default function TabLayout() {
         tabBarStyle: { display: 'none' },
       }}>
       <Tabs.Screen
-        name="chat"
-        options={{
-          title: 'Chat',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="message.fill" color={color} />,
-        }}
-      />
-      <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.fill" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="chat"
+        options={{
+          title: 'Chat',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="message.fill" color={color} />,
         }}
       />
     </Tabs>

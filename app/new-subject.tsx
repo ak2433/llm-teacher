@@ -1,3 +1,4 @@
+import { AppNavMenu } from '@/components/navigation/AppNavMenu';
 import { API_URL } from '@/constants/api';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -15,26 +16,31 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-type Format = 'course' | 'guide' | 'roadmap';
+type Format = 'course' | 'practice';
 
 const FORMAT_OPTIONS: { id: Format; label: string; icon: string }[] = [
   { id: 'course', label: 'Course', icon: '📖' },
-  { id: 'guide', label: 'Guide', icon: '📄' },
-  { id: 'roadmap', label: 'Roadmap', icon: '🗺️' },
+  { id: 'practice', label: 'Practice', icon: '📝' },
 ];
 
 export default function NewSubjectScreen() {
   const router = useRouter();
   const [topic, setTopic] = useState('');
   const [format, setFormat] = useState<Format>('course');
-  const [answerQuestions, setAnswerQuestions] = useState(false);
+  const [additionalContext, setAdditionalContext] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
 
-  const createSubjectAndNavigate = async (name: string) => {
+  const createSubjectAndNavigate = async (name: string, context?: string) => {
+    const payload: { name: string; additional_context?: string } = { name };
+    const trimmedContext = context?.trim();
+    if (trimmedContext) {
+      payload.additional_context = trimmedContext;
+    }
+
     const res = await fetch(`${API_URL}/subjects`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name }),
+      body: JSON.stringify(payload),
     });
 
     if (res.status === 409) {
@@ -56,7 +62,7 @@ export default function NewSubjectScreen() {
               if (existing) {
                 await fetch(`${API_URL}/subjects/${existing.id}`, { method: 'DELETE' });
               }
-              await createSubjectAndNavigate(name);
+              await createSubjectAndNavigate(name, additionalContext);
             },
           },
         ],
@@ -83,7 +89,7 @@ export default function NewSubjectScreen() {
 
     setIsGenerating(true);
     try {
-      await createSubjectAndNavigate(name);
+      await createSubjectAndNavigate(name, additionalContext);
     } catch (e) {
       Alert.alert('Error', 'Failed to create subject. Is the backend running?');
     } finally {
@@ -94,21 +100,12 @@ export default function NewSubjectScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar style="light" />
+      <AppNavMenu />
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Header with back */}
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backBtn}
-            onPress={() => router.back()}
-          >
-            <Text style={styles.backBtnText}>←</Text>
-          </TouchableOpacity>
-        </View>
-
         {/* Title */}
         <Text style={styles.title}>What can I help you learn?</Text>
         <Text style={styles.subtitle}>
@@ -166,19 +163,24 @@ export default function NewSubjectScreen() {
           </View>
         </View>
 
-        {/* Checkbox */}
-        <TouchableOpacity
-          style={styles.checkboxSection}
-          onPress={() => setAnswerQuestions(!answerQuestions)}
-          activeOpacity={0.8}
-        >
-          <View style={[styles.checkbox, answerQuestions && styles.checkboxChecked]}>
-            {answerQuestions && <Text style={styles.checkmark}>✓</Text>}
-          </View>
-          <Text style={styles.checkboxLabel}>
-            Answer the following questions for a better course
+        {/* Optional additional context */}
+        <View style={styles.contextSection}>
+          <Text style={styles.label}>
+            Add additional context or lense that you want this course to use. (optional)
           </Text>
-        </TouchableOpacity>
+          <View style={styles.contextBox}>
+            <TextInput
+              style={styles.contextInput}
+              placeholder="e.g. focus on practical projects, assume beginner level, emphasize exam prep…"
+              placeholderTextColor="rgb(136, 136, 136)"
+              value={additionalContext}
+              onChangeText={setAdditionalContext}
+              multiline
+              textAlignVertical="top"
+              autoCapitalize="sentences"
+            />
+          </View>
+        </View>
 
         {/* Generate button */}
         <TouchableOpacity
@@ -205,26 +207,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#212121',
+    position: 'relative',
   },
   scrollContent: {
     paddingHorizontal: 24,
+    paddingTop: 52,
     paddingBottom: 40,
     maxWidth: 480,
     alignSelf: 'center',
     width: '100%',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 32,
-  },
-  backBtn: {
-    padding: 8,
-    marginLeft: -8,
-  },
-  backBtnText: {
-    color: '#ffffff',
-    fontSize: 24,
   },
   title: {
     color: '#ffffff',
@@ -300,40 +291,24 @@ const styles = StyleSheet.create({
   formatLabelUnselected: {
     color: 'rgb(136, 136, 136)',
   },
-  checkboxSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#2d2d2d',
-    borderRadius: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+  contextSection: {
     marginBottom: 32,
+  },
+  contextBox: {
+    backgroundColor: '#2d2d2d',
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: 'rgb(63, 63, 63)',
+    minHeight: 100,
   },
-  checkbox: {
-    width: 22,
-    height: 22,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: 'rgb(110, 110, 110)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  checkboxChecked: {
-    backgroundColor: '#006BB3',
-    borderColor: '#006BB3',
-  },
-  checkmark: {
+  contextInput: {
     color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  checkboxLabel: {
-    flex: 1,
-    color: '#ffffff',
-    fontSize: 15,
+    fontSize: 16,
+    lineHeight: 22,
+    minHeight: 76,
+    ...(Platform.OS === 'web' && { outlineStyle: 'none' } as any),
   },
   generateBtn: {
     flexDirection: 'row',

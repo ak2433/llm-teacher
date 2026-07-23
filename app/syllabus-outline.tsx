@@ -1,7 +1,7 @@
 import { CodeBlock } from '@/components/chat/CodeBlock';
+import { AppNavMenu } from '@/components/navigation/AppNavMenu';
 import { API_URL } from '@/constants/api';
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from 'react';
 import {
@@ -10,7 +10,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import Markdown from 'react-native-markdown-display';
@@ -87,7 +86,6 @@ const markdownStyles = {
 };
 
 export default function SyllabusOutlineScreen() {
-  const router = useRouter();
   const { subjectId, subjectName } = useLocalSearchParams<{
     subjectId?: string;
     subjectName?: string;
@@ -132,16 +130,13 @@ export default function SyllabusOutlineScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar style="light" />
+      <AppNavMenu
+        subjectId={subjectId}
+        subjectName={typeof subjectName === 'string' ? subjectName : undefined}
+      />
 
       <View style={styles.topBar}>
-        <TouchableOpacity
-          style={styles.backBtn}
-          onPress={() => router.back()}
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-        >
-          <MaterialIcons name="arrow-back" size={22} color="#ffffff" />
-        </TouchableOpacity>
+        <View style={styles.topBarSpacer} />
         <Text style={styles.topTitle} numberOfLines={1}>
           Course outline
         </Text>
@@ -174,18 +169,19 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#212121',
+    position: 'relative',
   },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 8,
-    paddingVertical: 10,
+    paddingTop: 48,
+    paddingBottom: 10,
     borderBottomWidth: 1,
     borderBottomColor: 'rgb(63, 63, 63)',
   },
-  backBtn: {
-    padding: 10,
-    marginRight: 4,
+  topBarSpacer: {
+    width: 44,
   },
   topTitle: {
     flex: 1,
@@ -193,9 +189,6 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '600',
     textAlign: 'center',
-  },
-  topBarSpacer: {
-    width: 40,
   },
   scrollContent: {
     paddingHorizontal: 20,

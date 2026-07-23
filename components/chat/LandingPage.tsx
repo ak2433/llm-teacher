@@ -1,7 +1,13 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-export function LandingPage() {
+type LandingPageProps = {
+  courseTitle?: string;
+};
+
+export function LandingPage({ courseTitle }: LandingPageProps) {
+  const title = courseTitle?.trim() || 'Chat';
+
   return (
     <View style={styles.container}>
       {/* Free plan badge */}
@@ -13,12 +19,14 @@ export function LandingPage() {
         </TouchableOpacity>
       </View>
 
-      {/* Welcome message */}
+      {/* Course title */}
       <View style={styles.welcomeContainer}>
         <View style={styles.welcomeIcon}>
           <Text style={styles.welcomeIconText}>✦</Text>
         </View>
-        <Text style={styles.welcomeText}>Welcome Back</Text>
+        <Text style={styles.welcomeText} numberOfLines={2}>
+          {title}
+        </Text>
       </View>
     </View>
   );
@@ -71,8 +79,10 @@ const styles = StyleSheet.create({
     color: '#006BB3',
   },
   welcomeText: {
+    flexShrink: 1,
     fontSize: 32,
     fontWeight: '600',
     color: '#ffffff',
+    textAlign: 'center',
   },
 });
