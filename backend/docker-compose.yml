@@ -1,0 +1,38 @@
+# Local stack: Postgres + FastAPI (Ollama stays on the host)
+services:
+  db:
+    image: postgres:16
+    container_name: llm-teacher-pg
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: llm_teacher
+    ports:
+      - "5432:5432"
+    volumes:
+      - llm_teacher_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d llm_teacher"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    container_name: llm-teacher-api
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/llm_teacher
+      OLLAMA_HOST: http://host.docker.internal:11434
+      OLLAMA_MODEL: mistral:7b-instruct-q4_K_M
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      db:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  llm_teacher_pgdata:

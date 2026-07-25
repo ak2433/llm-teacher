@@ -24,7 +24,7 @@ export const API_URL =
   })!;
 
 /**
- * Optional Ollama model tag for /chat. If unset, the backend uses OLLAMA_MODEL (env) or llama3.1:8b.
+ * Optional Ollama model tag for /chat. If unset, the backend uses OLLAMA_MODEL (env) or mistral:7b-instruct-q4_K_M.
  * Set EXPO_PUBLIC_OLLAMA_MODEL=llama3.2:3b to match a smaller model after `ollama pull llama3.2:3b`.
  */
 export const EXPO_OLLAMA_MODEL = process.env.EXPO_PUBLIC_OLLAMA_MODEL?.trim() || undefined;

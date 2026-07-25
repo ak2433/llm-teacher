@@ -15,6 +15,21 @@ import {
 import Markdown from 'react-native-markdown-display';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+type SyllabusModule = {
+  module: number;
+  title: string;
+  objectives?: string[];
+  topics?: string[];
+  estimated_length?: string;
+  prerequisites?: string[];
+  takeaways?: string[];
+};
+
+type Syllabus = {
+  course_title?: string;
+  modules?: SyllabusModule[];
+};
+
 function trimFenceContent(content: string): string {
   if (
     typeof content === 'string' &&
@@ -85,6 +100,59 @@ const markdownStyles = {
   hr: { backgroundColor: '#3f3f3f', marginVertical: 14 },
 };
 
+function ModuleOutline({ mod }: { mod: SyllabusModule }) {
+  return (
+    <View style={styles.moduleBlock}>
+      <Text style={styles.moduleTitle}>
+        Module {mod.module}: {mod.title}
+      </Text>
+
+      <Text style={styles.sectionLabel}>Learning Objectives</Text>
+      {(mod.objectives ?? []).length === 0 ? (
+        <Text style={styles.muted}>None</Text>
+      ) : (
+        (mod.objectives ?? []).map((obj, i) => (
+          <Text key={`obj-${i}`} style={styles.bullet}>
+            • {obj}
+          </Text>
+        ))
+      )}
+
+      <Text style={styles.sectionLabel}>Topics</Text>
+      {(mod.topics ?? []).length === 0 ? (
+        <Text style={styles.muted}>None</Text>
+      ) : (
+        (mod.topics ?? []).map((topic, i) => (
+          <Text key={`topic-${i}`} style={styles.numbered}>
+            {i + 1}. {topic}
+          </Text>
+        ))
+      )}
+
+      <Text style={styles.sectionLabel}>Estimated Length</Text>
+      <Text style={styles.bodyLine}>{mod.estimated_length || '—'}</Text>
+
+      <Text style={styles.sectionLabel}>Prerequisites</Text>
+      <Text style={styles.bodyLine}>
+        {(mod.prerequisites ?? []).length > 0
+          ? (mod.prerequisites ?? []).join(', ')
+          : 'None'}
+      </Text>
+
+      {(mod.takeaways ?? []).length > 0 && (
+        <>
+          <Text style={styles.sectionLabel}>Takeaways</Text>
+          {(mod.takeaways ?? []).map((t, i) => (
+            <Text key={`take-${i}`} style={styles.bullet}>
+              • {t}
+            </Text>
+          ))}
+        </>
+      )}
+    </View>
+  );
+}
+
 export default function SyllabusOutlineScreen() {
   const { subjectId, subjectName } = useLocalSearchParams<{
     subjectId?: string;
@@ -92,6 +160,7 @@ export default function SyllabusOutlineScreen() {
   }>();
 
   const [loading, setLoading] = useState(true);
+  const [syllabus, setSyllabus] = useState<Syllabus | null>(null);
   const [markdown, setMarkdown] = useState('');
   const [courseTitle, setCourseTitle] = useState(subjectName ?? '');
   const [error, setError] = useState<string | null>(null);
@@ -111,8 +180,14 @@ export default function SyllabusOutlineScreen() {
           throw new Error(typeof data.detail === 'string' ? data.detail : `HTTP ${res.status}`);
         }
         if (!cancelled) {
-          setCourseTitle(typeof data.course_title === 'string' ? data.course_title : subjectName ?? '');
+          const s = (data.syllabus ?? null) as Syllabus | null;
+          setSyllabus(s);
           setMarkdown(typeof data.markdown === 'string' ? data.markdown : '');
+          setCourseTitle(
+            typeof data.course_title === 'string'
+              ? data.course_title
+              : s?.course_title || subjectName || ''
+          );
         }
       } catch (e) {
         if (!cancelled) {
@@ -126,6 +201,9 @@ export default function SyllabusOutlineScreen() {
       cancelled = true;
     };
   }, [subjectId, subjectName]);
+
+  const modules = syllabus?.modules ?? [];
+  const hasModules = modules.length > 0;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -153,11 +231,19 @@ export default function SyllabusOutlineScreen() {
         ) : (
           <>
             <Text style={styles.courseHeading}>{courseTitle || 'Course'}</Text>
-            <View style={styles.mdWrap}>
-              <Markdown style={markdownStyles} rules={markdownCodeRules}>
-                {markdown || '*No content.*'}
-              </Markdown>
-            </View>
+            {hasModules ? (
+              modules.map((mod) => (
+                <ModuleOutline key={`${mod.module}-${mod.title}`} mod={mod} />
+              ))
+            ) : markdown.trim() ? (
+              <View style={styles.mdWrap}>
+                <Markdown style={markdownStyles} rules={markdownCodeRules}>
+                  {markdown}
+                </Markdown>
+              </View>
+            ) : (
+              <Text style={styles.emptyText}>No syllabus outline available.</Text>
+            )}
           </>
         )}
       </ScrollView>
@@ -177,8 +263,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingTop: 48,
     paddingBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgb(63, 63, 63)',
   },
   topBarSpacer: {
     width: 44,
@@ -203,15 +287,60 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   courseHeading: {
-    color: '#aaaaaa',
-    fontSize: 14,
+    color: '#ffffff',
+    fontSize: 22,
+    fontWeight: '700',
+    marginBottom: 20,
+  },
+  moduleBlock: {
+    marginBottom: 28,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#2a2a2a',
+  },
+  moduleTitle: {
+    color: '#ffffff',
+    fontSize: 18,
     fontWeight: '600',
-    marginBottom: 16,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    marginBottom: 12,
+  },
+  sectionLabel: {
+    color: '#f0f0f0',
+    fontSize: 15,
+    fontWeight: '600',
+    marginTop: 12,
+    marginBottom: 6,
+  },
+  bullet: {
+    color: '#ffffff',
+    fontSize: 15,
+    lineHeight: 22,
+    marginLeft: 4,
+    marginVertical: 2,
+  },
+  numbered: {
+    color: '#ffffff',
+    fontSize: 15,
+    lineHeight: 22,
+    marginLeft: 4,
+    marginVertical: 2,
+  },
+  bodyLine: {
+    color: '#ffffff',
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  muted: {
+    color: '#888888',
+    fontSize: 15,
+    lineHeight: 22,
   },
   mdWrap: {
     flexGrow: 1,
+  },
+  emptyText: {
+    color: '#aaaaaa',
+    fontSize: 15,
   },
   errorText: {
     color: '#ff8888',

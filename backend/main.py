@@ -31,16 +31,16 @@ from llm_prompts import (
     ROLE_CONTENT_TUTOR,
     SYSTEM_PROMPTS,
 )
-from syllabus_rag import (
+from syllabus_model import (
+    extract_json_payload,
     format_course_outline,
-    parse_markdown_sections,
-    search_sections,
-    sections_context_for_llm,
+    normalize_syllabus,
+    syllabus_to_markdown,
 )
 from syllabus_storage import (
     delete_syllabus_dir,
-    write_syllabus_markdown,
-    read_syllabus_markdown_file,
+    write_syllabus_json,
+    read_syllabus_json,
     load_quizzes_json,
     save_quizzes_json,
 )
@@ -55,18 +55,34 @@ from quiz_agents import (
 )
 
 
-def get_syllabus_text(subject_id: int) -> Optional[str]:
-    file_text = read_syllabus_markdown_file(subject_id)
-    if file_text and file_text.strip():
-        return file_text
+def get_syllabus(subject_id: int) -> Optional[dict]:
+    """Load normalized syllabus JSON from disk, falling back to DB curriculum blob."""
+    file_data = read_syllabus_json(subject_id)
+    if file_data:
+        try:
+            return normalize_syllabus(file_data)
+        except ValueError:
+            pass
     cur = get_curriculum_by_subject(subject_id)
-    if cur and (cur.get("content") or "").strip():
-        return cur["content"]
-    return None
+    raw = (cur or {}).get("content") or ""
+    if not str(raw).strip():
+        return None
+    try:
+        return normalize_syllabus(extract_json_payload(raw))
+    except (ValueError, json.JSONDecodeError):
+        return None
+
+
+def persist_syllabus(subject_id: int, raw_text: str, fallback_title: str = "") -> dict:
+    """Parse model JSON, normalize, save to DB + syllabus.json."""
+    syllabus = normalize_syllabus(extract_json_payload(raw_text), fallback_title=fallback_title)
+    save_curriculum(subject_id, json.dumps(syllabus, indent=2, ensure_ascii=False))
+    write_syllabus_json(subject_id, syllabus)
+    return syllabus
 
 
 def default_ollama_model() -> str:
-    return os.environ.get("OLLAMA_MODEL", "llama3.1:8b")
+    return os.environ.get("OLLAMA_MODEL", "mistral:7b-instruct-q4_K_M")
 
 
 # Initialize database on startup
@@ -98,7 +114,7 @@ class Message(BaseModel):
 
 class ChatRequest(BaseModel):
     messages: List[Message]
-    model: Optional[str] = None  # falls back to OLLAMA_MODEL env or llama3.1:8b
+    model: Optional[str] = None  # falls back to OLLAMA_MODEL env or mistral:7b-instruct-q4_K_M
     subject: Optional[str] = None
     subject_id: Optional[int] = None
     is_new_subject: Optional[bool] = False
@@ -140,8 +156,8 @@ def _build_ollama_messages(
     """
     subject = request.subject or "default"
     subject_id = request.subject_id
-    syllabus = get_syllabus_text(subject_id) if subject_id else None
-    has_syllabus = bool(syllabus and syllabus.strip())
+    syllabus = get_syllabus(subject_id) if subject_id else None
+    has_syllabus = bool(syllabus and syllabus.get("modules"))
     is_first = bool(request.is_new_subject and len(request.messages) == 1)
     legacy_init = is_first and subject_id is not None and not has_syllabus
     use_tutor = bool(subject_id and has_syllabus and not legacy_init)
@@ -154,19 +170,14 @@ def _build_ollama_messages(
         return ollama_messages, True
 
     if use_tutor and syllabus is not None:
-        sections = parse_markdown_sections(syllabus)
         ollama_messages = [{"role": "system", "content": ROLE_CONTENT_TUTOR}]
         msgs: List[dict] = [{"role": m.role, "content": m.content} for m in request.messages]
         if msgs and msgs[-1]["role"] == "user":
             q = msgs[-1]["content"]
-            outline = format_course_outline(sections)
-            chunks = search_sections(q, sections, top_k=5)
-            related = sections_context_for_llm(chunks)
+            outline = format_course_outline(syllabus)
             msgs[-1]["content"] = (
-                "## Course map (from syllabus — full outline)\n"
+                "## Course map (syllabus outline — use as a guide, not as content to recite)\n"
                 f"{outline}\n\n"
-                "## Related syllabus excerpts (hints for this question)\n"
-                f"{related}\n\n"
                 "---\n\n"
                 f"Student question:\n{q}"
             )
@@ -204,8 +215,11 @@ async def chat(request: ChatRequest):
                 yield json.dumps({"token": token}) + "\n"
 
             if save_as_curriculum and full_response and subject_id_for_save:
-                save_curriculum(subject_id_for_save, full_response)
-                write_syllabus_markdown(subject_id_for_save, full_response)
+                try:
+                    persist_syllabus(subject_id_for_save, full_response)
+                except Exception as e:
+                    yield json.dumps({"error": f"Could not save syllabus JSON: {e!s}"}) + "\n"
+                    return
 
             if subject_id_for_save and request.messages and full_response:
                 last_user = request.messages[-1]
@@ -230,7 +244,7 @@ async def list_subjects():
 
 @app.post("/subjects", response_model=SubjectResponse)
 async def add_subject(subject: SubjectCreate):
-    """Create a new subject, generate syllabus (markdown) via Ollama, rejecting duplicates with 409."""
+    """Create a new subject, generate syllabus JSON via Ollama, rejecting duplicates with 409."""
     try:
         existing = get_subject_by_name(subject.name)
         if existing:
@@ -257,8 +271,7 @@ async def add_subject(subject: SubjectCreate):
             curriculum_text = (response.get("message") or {}).get("content") or ""
             if not str(curriculum_text).strip():
                 raise ValueError("Model returned an empty curriculum.")
-            save_curriculum(new_subject["id"], curriculum_text)
-            write_syllabus_markdown(new_subject["id"], curriculum_text)
+            persist_syllabus(new_subject["id"], curriculum_text, fallback_title=subject.name)
         except Exception as e:
             delete_subject(new_subject["id"])
             delete_syllabus_dir(new_subject["id"])
@@ -293,17 +306,32 @@ async def get_subject_messages(subject_id: int, limit: int = 4):
 
 @app.get("/subjects/{subject_id}/syllabus/outline")
 async def get_syllabus_outline(subject_id: int):
-    """Raw markdown from ``syllabus.md`` on disk only (``data/syllabi/{id}/syllabus.md``)."""
+    """Syllabus for the outline page: JSON when available, plus markdown for display."""
     subject = get_subject_by_id(subject_id)
     if not subject:
         raise HTTPException(status_code=404, detail="Subject not found")
-    text = read_syllabus_markdown_file(subject_id)
-    if not text or not text.strip():
+
+    syllabus = get_syllabus(subject_id)
+    if syllabus:
+        return {
+            "course_title": syllabus.get("course_title") or subject["name"],
+            "syllabus": syllabus,
+            "markdown": syllabus_to_markdown(syllabus),
+        }
+
+    # Legacy fallback: curriculum stored as freeform markdown/text
+    cur = get_curriculum_by_subject(subject_id)
+    raw = ((cur or {}).get("content") or "").strip()
+    if not raw:
         raise HTTPException(
             status_code=404,
-            detail="No syllabus markdown file found for this subject.",
+            detail="No syllabus found for this subject.",
         )
-    return {"course_title": subject["name"], "markdown": text}
+    return {
+        "course_title": subject["name"],
+        "syllabus": None,
+        "markdown": raw,
+    }
 
 
 @app.patch("/subjects/{subject_id}", response_model=SubjectResponse)
@@ -366,9 +394,15 @@ async def upload_subject(file: UploadFile = File(...), name: Optional[str] = Non
             ],
         )
         curriculum_text = response["message"]["content"]
-
-        save_curriculum(new_subject["id"], curriculum_text)
-        write_syllabus_markdown(new_subject["id"], curriculum_text)
+        try:
+            persist_syllabus(new_subject["id"], curriculum_text, fallback_title=subject_name)
+        except Exception as e:
+            delete_subject(new_subject["id"])
+            delete_syllabus_dir(new_subject["id"])
+            raise HTTPException(
+                status_code=500,
+                detail=f"Could not generate syllabus JSON: {e!s}",
+            ) from e
 
         new_subject["is_new_subject"] = True
         return new_subject
@@ -384,13 +418,13 @@ async def get_current_quiz(subject_id: int):
     sub = get_subject_by_id(subject_id)
     if not sub:
         raise HTTPException(status_code=404, detail="Subject not found")
-    syllabus = get_syllabus_text(subject_id)
-    if not syllabus or not syllabus.strip():
+    syllabus = get_syllabus(subject_id)
+    if not syllabus:
         raise HTTPException(status_code=400, detail="No syllabus for this subject.")
     sections = eligible_quiz_sections(syllabus)
     n = len(sections)
     if n == 0:
-        raise HTTPException(status_code=400, detail="Could not derive syllabus sections.")
+        raise HTTPException(status_code=400, detail="Could not derive syllabus modules.")
     idx = int(sub.get("next_section_index") or 0)
     if idx >= n:
         return {
@@ -426,13 +460,13 @@ async def submit_section_quiz(subject_id: int, body: QuizSubmit):
     sub = get_subject_by_id(subject_id)
     if not sub:
         raise HTTPException(status_code=404, detail="Subject not found")
-    syllabus = get_syllabus_text(subject_id)
-    if not syllabus or not syllabus.strip():
+    syllabus = get_syllabus(subject_id)
+    if not syllabus:
         raise HTTPException(status_code=400, detail="No syllabus for this subject.")
     sections = eligible_quiz_sections(syllabus)
     n = len(sections)
     if n == 0:
-        raise HTTPException(status_code=400, detail="Could not derive syllabus sections.")
+        raise HTTPException(status_code=400, detail="Could not derive syllabus modules.")
     idx = int(sub.get("next_section_index") or 0)
     if idx >= n:
         raise HTTPException(status_code=400, detail="There is no active quiz.")

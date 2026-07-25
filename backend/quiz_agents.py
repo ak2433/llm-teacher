@@ -8,21 +8,14 @@ import re
 import ollama
 
 from llm_prompts import ROLE_QUIZ_AUTHOR
-from syllabus_rag import parse_markdown_sections
+from syllabus_model import modules_as_quiz_sections
 
 QUIZ_PASS_THRESHOLD = 75.0
 
 
-def eligible_quiz_sections(syllabus_text: str) -> list[dict[str, str]]:
-    """Sections long enough for MCQs; mirrors demo's skip-if-body-too-short."""
-    sections = parse_markdown_sections(syllabus_text)
-    long_enough = [s for s in sections if len((s.get("body") or "").strip()) >= 50]
-    if long_enough:
-        return long_enough
-    with_body = [s for s in sections if (s.get("body") or "").strip()]
-    if with_body:
-        return with_body
-    return sections
+def eligible_quiz_sections(syllabus: dict) -> list[dict[str, str]]:
+    """One quiz section per syllabus module."""
+    return modules_as_quiz_sections(syllabus)
 
 
 def extract_json_object(text: str) -> dict:

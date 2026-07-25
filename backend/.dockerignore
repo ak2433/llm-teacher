@@ -1,0 +1,12 @@
+__pycache__
+*.pyc
+*.pyo
+.env
+.venv
+venv
+learning_app.db
+*.db
+.git
+.gitignore
+.pytest_cache
+data/syllabi

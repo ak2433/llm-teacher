@@ -1,15 +1,16 @@
-# Per-subject syllabus.md on disk (mirrors 10_syllabus_quiz_agents workspace/syllabus.md)
+# Per-subject syllabus.json + quizzes.json on disk
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 _data_root = Path(__file__).resolve().parent / "data" / "syllabi"
 
 
 def syllabus_path(subject_id: int) -> Path:
-    return _data_root / str(subject_id) / "syllabus.md"
+    return _data_root / str(subject_id) / "syllabus.json"
 
 
 def ensure_syllabus_dir(subject_id: int) -> Path:
@@ -18,16 +19,20 @@ def ensure_syllabus_dir(subject_id: int) -> Path:
     return p
 
 
-def write_syllabus_markdown(subject_id: int, text: str) -> None:
+def write_syllabus_json(subject_id: int, syllabus: dict[str, Any]) -> None:
     path = ensure_syllabus_dir(subject_id)
-    path.write_text(text, encoding="utf-8")
+    path.write_text(json.dumps(syllabus, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
-def read_syllabus_markdown_file(subject_id: int) -> str | None:
+def read_syllabus_json(subject_id: int) -> dict[str, Any] | None:
     path = syllabus_path(subject_id)
     if not path.is_file():
         return None
-    return path.read_text(encoding="utf-8", errors="replace")
+    try:
+        data = json.loads(path.read_text(encoding="utf-8", errors="replace"))
+    except json.JSONDecodeError:
+        return None
+    return data if isinstance(data, dict) else None
 
 
 def quizzes_json_path(subject_id: int) -> Path:

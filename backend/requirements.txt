@@ -6,3 +6,4 @@ chromadb
 python-multipart
 PyPDF2
 python-docx
+psycopg[binary]>=3.1.0
